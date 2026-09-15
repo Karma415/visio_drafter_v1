@@ -25,7 +25,7 @@ const storage = new MemoryStorage();
 Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
 const { createDocument } = await import('../src/domain/document.ts');
 const { inchesToMm, mmToInches, paperMm, parseInches } = await import('../src/domain/units.ts');
-const { distanceBetween, resizeWallToLength, snap, screenToWorld, snapShapeOrigin, snapToDrawingPoint, snapToWallFace, snapToWallPoint, snapWallEndpoint, snapWallOrigin, visibleGridStep, nodePosition, normalizePoints, resizePoints, snappedBounds, wallLength } = await import('../src/domain/geometry.ts');
+const { distanceBetween, findAlignmentGuides, resizeWallToLength, snap, screenToWorld, snapShapeOrigin, snapToDrawingPoint, snapToWallFace, snapToWallPoint, snapWallEndpoint, snapWallOrigin, visibleGridStep, nodePosition, normalizePoints, resizePoints, snappedBounds, wallLength } = await import('../src/domain/geometry.ts');
 const { decodeDrawing, encodeDrawing } = await import('../src/services/drawingFiles.ts');
 const { loadRecovery, saveRecovery } = await import('../src/services/recovery.ts');
 const { useDrawingStore } = await import('../src/store/useDrawingStore.ts');
@@ -345,3 +345,23 @@ test('furniture uses approved kinds and keeps real-world editable dimensions thr
   assert.equal(FURNITURE_KINDS.length, 4);
   assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...furniture, furnitureKind: 'unknown' }] })));
 });
+
+test('alignment guides detect edge and center alignments between dragged shape and targets', () => {
+  const target = { ...shape, id: 'target', x: 200, y: 100, width: 200, height: 100 };
+  const dragged = { ...shape, id: 'dragged', x: 0, y: 0, width: 100, height: 100 };
+
+  // Aligned on left edge (x = 200) and top edge (y = 100)
+  const guides = findAlignmentGuides({ x: 200, y: 100 }, dragged, [target]);
+  assert.ok(guides.some((g) => g.orientation === 'vertical' && g.position === 200));
+  assert.ok(guides.some((g) => g.orientation === 'horizontal' && g.position === 100));
+
+  // Aligned on center X (dragged center = 250 + 50 = 300, target center = 200 + 100 = 300)
+  const centerGuides = findAlignmentGuides({ x: 250, y: 400 }, dragged, [target]);
+  assert.ok(centerGuides.some((g) => g.orientation === 'vertical' && g.position === 300));
+  assert.equal(centerGuides.some((g) => g.orientation === 'horizontal'), false);
+
+  // 1D alignment snapping snaps X when near target edge while Y falls back to grid
+  const snapResult = snapShapeOrigin({ x: 196, y: 403 }, dragged, [target], 25, 12);
+  assert.deepEqual(snapResult, { point: { x: 200, y: 400 }, kind: 'object' });
+});
+

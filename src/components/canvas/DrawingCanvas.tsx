@@ -12,6 +12,7 @@ import { DrawingGrid } from './DrawingGrid';
 import { ShapeView } from './ShapeView';
 import type { ShapeNode } from './ShapeView';
 import { MeasurementOverlay } from './MeasurementOverlay';
+import { AlignmentGuides } from './AlignmentGuides';
 
 export function DrawingCanvas() {
   const container = useRef<HTMLDivElement | null>(null);
@@ -26,6 +27,7 @@ export function DrawingCanvas() {
   const scale = useEditorStore((state) => state.scale);
   const position = useEditorStore((state) => state.position);
   const wallDefaults = useEditorStore((state) => state.wallDefaults);
+  const alignmentGuides = useEditorStore((state) => state.alignmentGuides);
   const selectedShape = document.shapes.find((shape) => shape.id === selectedId);
   const register = useCallback((id: string, node: ShapeNode | null) => {
     if (!node) {
@@ -291,6 +293,7 @@ export function DrawingCanvas() {
         {activeDraft && <Line points={draftPoints} closed={activeDraft.type === 'polygon'} stroke="#475569" strokeWidth={3 / scale} dash={[8 / scale, 8 / scale]} listening={false} />}
         {measurement && measurementEnd && <MeasurementOverlay start={measurement.start} end={measurementEnd}
           preview={true} scale={scale} unit={document.displayUnit} />}
+        <AlignmentGuides guides={alignmentGuides} scale={scale} viewport={{ position, size }} />
         <Transformer ref={transformerRef} rotateEnabled={selectedShape?.type !== 'measurement'} flipEnabled={false}
           keepRatio={Boolean(selectedShape && isProportionalShape(selectedShape))}
           ignoreStroke={true} borderStroke="#1d4ed8" borderStrokeWidth={2}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Point } from '../domain/geometry';
+import type { AlignmentGuide, Point } from '../domain/geometry';
 import type { ShapeType } from '../domain/document';
 import type { WallType } from '../domain/walls';
 import { DEFAULT_WALL_TYPE, WALL_DEFINITIONS } from '../domain/walls';
@@ -17,6 +17,7 @@ interface EditorState {
   error: string | null;
   snapStatus: SnapStatus;
   wallDefaults: WallDefaults;
+  alignmentGuides: AlignmentGuide[];
   setTool: (tool: ActiveTool) => void;
   select: (id: string | null) => void;
   editText: (id: string | null) => void;
@@ -24,18 +25,21 @@ interface EditorState {
   reportError: (error: unknown) => void;
   setSnapStatus: (status: SnapStatus) => void;
   setWallDefaults: (defaults: WallDefaults) => void;
+  setAlignmentGuides: (guides: AlignmentGuide[]) => void;
   resetView: () => void;
 }
 export const useEditorStore = create<EditorState>((set) => ({
   activeTool: 'select', selectedId: null, editingId: null,
   scale: BASE_PIXELS_PER_MM, position: { x: 40, y: 40 }, error: null, snapStatus: null,
   wallDefaults: { wallType: DEFAULT_WALL_TYPE, wallThicknessMm: WALL_DEFINITIONS[DEFAULT_WALL_TYPE].defaultThicknessMm },
-  setTool: (activeTool) => set({ activeTool }),
-  select: (selectedId) => set({ selectedId }),
+  alignmentGuides: [],
+  setTool: (activeTool) => set({ activeTool, alignmentGuides: [] }),
+  select: (selectedId) => set({ selectedId, alignmentGuides: [] }),
   editText: (editingId) => set({ editingId }),
   setViewport: (position, scale) => set({ position, scale }),
   reportError: (error) => set({ error: error === null ? null : error instanceof Error ? error.message : 'The operation could not be completed.' }),
   setSnapStatus: (snapStatus) => set({ snapStatus }),
   setWallDefaults: (wallDefaults) => set({ wallDefaults }),
-  resetView: () => set({ activeTool: 'select', selectedId: null, editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null }),
+  setAlignmentGuides: (alignmentGuides) => set({ alignmentGuides }),
+  resetView: () => set({ activeTool: 'select', selectedId: null, editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [] }),
 }));

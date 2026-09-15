@@ -237,10 +237,59 @@ export function snapWallEndpoint(point: ShapePoint, fixedEndpoint: ShapePoint, s
     : ordinary;
 }
 
+export interface AlignmentGuide {
+  orientation: 'vertical' | 'horizontal';
+  position: number;
+}
+
+/**
+ * Finds vertical and horizontal alignment lines between a dragged shape's
+ * edges/center and other shapes in the drawing.
+ */
+export function findAlignmentGuides(origin: ShapePoint, draggedShape: Shape, shapes: Shape[], toleranceMm = 0.5): AlignmentGuide[] {
+  const guides: AlignmentGuide[] = [];
+  const draggedXTargets = [origin.x, origin.x + draggedShape.width / 2, origin.x + draggedShape.width];
+  const draggedYTargets = [origin.y, origin.y + draggedShape.height / 2, origin.y + draggedShape.height];
+
+  const matchedX = new Set<number>();
+  const matchedY = new Set<number>();
+
+  for (const shape of shapes) {
+    if (shape.id === draggedShape.id || shape.type === 'measurement') continue;
+    const targetXList = [shape.x, shape.x + shape.width / 2, shape.x + shape.width];
+    const targetYList = [shape.y, shape.y + shape.height / 2, shape.y + shape.height];
+
+    for (const dx of draggedXTargets) {
+      for (const tx of targetXList) {
+        if (Math.abs(dx - tx) <= toleranceMm) {
+          const rounded = Math.round(tx * 1000) / 1000;
+          if (!matchedX.has(rounded)) {
+            matchedX.add(rounded);
+            guides.push({ orientation: 'vertical', position: tx });
+          }
+        }
+      }
+    }
+
+    for (const dy of draggedYTargets) {
+      for (const ty of targetYList) {
+        if (Math.abs(dy - ty) <= toleranceMm) {
+          const rounded = Math.round(ty * 1000) / 1000;
+          if (!matchedY.has(rounded)) {
+            matchedY.add(rounded);
+            guides.push({ orientation: 'horizontal', position: ty });
+          }
+        }
+      }
+    }
+  }
+
+  return guides;
+}
+
 /**
  * Aligns any unrotated bounding-box anchor of the dragged shape to a nearby
- * anchor on another shape. This makes corner-to-corner snapping perceptible,
- * rather than only snapping the dragged shape's top-left origin.
+ * anchor or edge/center line on another shape, falling back to the physical grid.
  */
 export function snapShapeOrigin(origin: ShapePoint, draggedShape: Shape, shapes: Shape[], gridMm: number, thresholdMm: number): SnapResult {
   const localAnchors = shapeSnapPoints({ ...draggedShape, x: 0, y: 0 });
@@ -260,9 +309,54 @@ export function snapShapeOrigin(origin: ShapePoint, draggedShape: Shape, shapes:
       }
     }
   }
-  return result
-    ? { point: result, kind: 'object' }
-    : { point: { x: snap(origin.x, gridMm), y: snap(origin.y, gridMm) }, kind: 'grid' };
+
+  if (result) {
+    return { point: result, kind: 'object' };
+  }
+
+  // Check 1D edge/center alignment along X and Y axes independently
+  const localXAnchors = [0, draggedShape.width / 2, draggedShape.width];
+  const localYAnchors = [0, draggedShape.height / 2, draggedShape.height];
+  let bestX: { originX: number; distance: number } | null = null;
+  let bestY: { originY: number; distance: number } | null = null;
+
+  for (const shape of shapes) {
+    if (shape.id === draggedShape.id || shape.type === 'measurement') continue;
+    const targetXList = [shape.x, shape.x + shape.width / 2, shape.x + shape.width];
+    const targetYList = [shape.y, shape.y + shape.height / 2, shape.y + shape.height];
+
+    for (const localX of localXAnchors) {
+      const candidateX = origin.x + localX;
+      for (const tx of targetXList) {
+        const dist = Math.abs(tx - candidateX);
+        if (dist <= thresholdMm && (!bestX || dist < bestX.distance)) {
+          bestX = { originX: tx - localX, distance: dist };
+        }
+      }
+    }
+
+    for (const localY of localYAnchors) {
+      const candidateY = origin.y + localY;
+      for (const ty of targetYList) {
+        const dist = Math.abs(ty - candidateY);
+        if (dist <= thresholdMm && (!bestY || dist < bestY.distance)) {
+          bestY = { originY: ty - localY, distance: dist };
+        }
+      }
+    }
+  }
+
+  if (bestX || bestY) {
+    return {
+      point: {
+        x: bestX ? bestX.originX : snap(origin.x, gridMm),
+        y: bestY ? bestY.originY : snap(origin.y, gridMm),
+      },
+      kind: 'object',
+    };
+  }
+
+  return { point: { x: snap(origin.x, gridMm), y: snap(origin.y, gridMm) }, kind: 'grid' };
 }
 
 /** Move a whole wall so either endpoint joins another wall's centerline. */

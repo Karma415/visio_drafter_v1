@@ -3,7 +3,7 @@ import { Arc, Ellipse, Group, Line, Rect, RegularPolygon, Text } from 'react-kon
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Shape } from '../../domain/document';
-import { distanceBetween, isCenteredShape, nodePosition, snapShapeOrigin, snapWallOrigin } from '../../domain/geometry';
+import { distanceBetween, findAlignmentGuides, isCenteredShape, nodePosition, snapShapeOrigin, snapWallOrigin } from '../../domain/geometry';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { WALL_DEFINITIONS } from '../../domain/walls';
@@ -40,6 +40,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
   }
   function dragEnd(event: KonvaEventObject<DragEvent>) {
     event.cancelBubble = true;
+    useEditorStore.getState().setAlignmentGuides([]);
     const node = event.target;
     const offset = isCenteredShape(shape) ? { x: shape.width / 2, y: shape.height / 2 } : { x: 0, y: 0 };
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
@@ -66,14 +67,22 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
     if (event.evt.altKey) {
       useEditorStore.getState().setSnapStatus('Free placement (Alt)');
+      useEditorStore.getState().setAlignmentGuides([]);
       return;
     }
     const editorScale = useEditorStore.getState().scale;
+    const shapes = useDrawingStore.getState().document.shapes;
     const snapResult = shape.type === 'wall'
-      ? snapWallOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale)
-      : snapShapeOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale);
+      ? snapWallOrigin(raw, shape, shapes, gridMm, 16 / editorScale)
+      : snapShapeOrigin(raw, shape, shapes, gridMm, 16 / editorScale);
     node.position(nodePosition({ ...shape, ...snapResult.point }));
     useEditorStore.getState().setSnapStatus(snapResult.kind === 'wall' ? 'Wall join snap' : snapResult.kind === 'object' ? 'Object snap' : 'Grid snap');
+    if (shape.type !== 'wall') {
+      const guides = findAlignmentGuides(snapResult.point, shape, shapes, 0.5);
+      useEditorStore.getState().setAlignmentGuides(guides);
+    } else {
+      useEditorStore.getState().setAlignmentGuides([]);
+    }
   }
   const nodeProps = {
     ref, ...nodePosition(shape), rotation: shape.rotation ?? 0, draggable: selectable,
