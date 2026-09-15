@@ -1,0 +1,28 @@
+import { useEffect } from 'react';
+import { useDrawingStore } from '../store/useDrawingStore';
+import { useEditorStore } from '../store/useEditorStore';
+
+export function useEditorKeyboard() {
+  useEffect(() => {
+    function handleKey(event: KeyboardEvent) {
+      const target = event.target;
+      if (event.isComposing || document.querySelector('dialog[open]') ||
+        (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select')))) return;
+      const drawing = useDrawingStore.getState();
+      const editor = useEditorStore.getState();
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) drawing.redo(); else drawing.undo();
+      } else if (editor.selectedId && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
+        drawing.deleteShape(editor.selectedId);
+        editor.select(null);
+      } else if (event.key === 'Escape') {
+        editor.select(null);
+        editor.setTool('select');
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+}
