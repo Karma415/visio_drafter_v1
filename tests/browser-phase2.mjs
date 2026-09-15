@@ -93,7 +93,7 @@ try {
   await waitFor(`window.Konva.stages[0].find('Text').some((node) => node.text().includes('in'))`, 'temporary measurement label');
   await waitFor(`document.body.innerText.includes('Selected measurement')`, 'saved measurement selection');
   await clickButton('Delete selected');
-  await clickButton('Draw');
+  await clickButton('Tools');
   await clickButton('Connected line');
   await clickCanvas(canvasX(0.4), y + 500); await clickCanvas(canvasX(0.52), y + 540); await clickCanvas(canvasX(0.64), y + 480); await key('Enter', 13);
   await waitFor(`document.body.innerText.includes('Selected polyline')`, 'polyline completion');

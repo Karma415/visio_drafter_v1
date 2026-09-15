@@ -7,6 +7,7 @@ import { FileControls } from './FileControls';
 import type { CommandTab } from './navigation';
 import type { FurnitureCategory } from '../../domain/furniture';
 import { FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
+import { ToolIcon } from './ToolIcons';
 
 const TOOLS: { id: ActiveTool; label: string }[] = [
   { id: 'select', label: 'Select / pan' }, { id: 'line', label: 'Line' },
@@ -44,7 +45,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   );
 
   return <aside className="sidebar" aria-label="Drawing tools and properties">
-    <h1>Karma's apartment draft</h1>
+    <h1>{drawing.name || "Karma's apartment draft"}</h1>
     <p className="muted">Actual measurements in inches · drawing scale 1:25</p>
     {error && <div role="alert" className="error">{error}<button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().reportError(null)}>Dismiss</button></div>}
     {warning && <div role="alert" className="error"><p>{warning}</p>
@@ -86,7 +87,10 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
         </>
       ) : tools.length > 0 ? (
         <div className="tool-grid">{tools.map((tool) =>
-          <button key={tool.id} type="button" className="tool-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>{tool.label}</button>,
+          <button key={tool.id} type="button" className="tool-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>
+            <ToolIcon tool={tool.id} />
+            <span>{tool.label}</span>
+          </button>,
         )}</div>
       ) : null}
       <div className="button-row"><button type="button" className="btn-secondary" disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>

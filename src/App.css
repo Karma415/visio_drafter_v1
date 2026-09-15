@@ -82,6 +82,22 @@
   white-space: nowrap;
 }
 
+.command-bar__brand .command-bar__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  background: var(--cad-accent-primary);
+  color: #ffffff;
+  border: 1px solid var(--cad-accent-primary-hover);
+  border-radius: 5px;
+  letter-spacing: 0;
+}
+
 .command-bar__brand span {
   display: inline-block;
   padding: 2px 6px;
@@ -314,6 +330,10 @@
 }
 
 .tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: var(--cad-bg-surface);
   border: 1px solid var(--cad-border-subtle);
   color: var(--cad-text-primary);
@@ -324,10 +344,19 @@
   font-weight: 500;
 }
 
+.tool-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 .tool-btn:hover {
   background: var(--cad-bg-surface-hover);
   border-color: var(--cad-border-input);
   color: var(--cad-text-bright);
+}
+
+.tool-btn:hover .tool-icon {
+  opacity: 1;
 }
 
 .tool-btn[aria-pressed="true"] {
@@ -336,6 +365,11 @@
   color: var(--cad-text-bright);
   box-shadow: 0 0 0 1px var(--cad-accent-cyan), 0 0 8px var(--cad-accent-glow);
   font-weight: 600;
+}
+
+.tool-btn[aria-pressed="true"] .tool-icon {
+  opacity: 1;
+  color: var(--cad-accent-cyan);
 }
 
 .btn-primary {
