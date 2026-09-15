@@ -3,6 +3,8 @@ import type { AlignmentGuide, Point } from '../domain/geometry';
 import type { ShapeType } from '../domain/document';
 import type { WallType } from '../domain/walls';
 import { DEFAULT_WALL_TYPE, WALL_DEFINITIONS } from '../domain/walls';
+import type { FurnitureKind } from '../domain/furniture';
+import { DEFAULT_FURNITURE_KIND } from '../domain/furniture';
 
 export type ActiveTool = 'select' | 'measure' | ShapeType;
 export type SnapStatus = 'Object snap' | 'Wall join snap' | 'Grid snap' | 'Free placement (Alt)' | null;
@@ -18,6 +20,7 @@ interface EditorState {
   snapStatus: SnapStatus;
   wallDefaults: WallDefaults;
   alignmentGuides: AlignmentGuide[];
+  placedFurnitureKind: FurnitureKind;
   setTool: (tool: ActiveTool) => void;
   select: (id: string | null) => void;
   editText: (id: string | null) => void;
@@ -26,6 +29,7 @@ interface EditorState {
   setSnapStatus: (status: SnapStatus) => void;
   setWallDefaults: (defaults: WallDefaults) => void;
   setAlignmentGuides: (guides: AlignmentGuide[]) => void;
+  setPlacedFurnitureKind: (kind: FurnitureKind) => void;
   resetView: () => void;
 }
 export const useEditorStore = create<EditorState>((set) => ({
@@ -33,6 +37,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   scale: BASE_PIXELS_PER_MM, position: { x: 40, y: 40 }, error: null, snapStatus: null,
   wallDefaults: { wallType: DEFAULT_WALL_TYPE, wallThicknessMm: WALL_DEFINITIONS[DEFAULT_WALL_TYPE].defaultThicknessMm },
   alignmentGuides: [],
+  placedFurnitureKind: DEFAULT_FURNITURE_KIND,
   setTool: (activeTool) => set({ activeTool, alignmentGuides: [] }),
   select: (selectedId) => set({ selectedId, alignmentGuides: [] }),
   editText: (editingId) => set({ editingId }),
@@ -41,5 +46,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSnapStatus: (snapStatus) => set({ snapStatus }),
   setWallDefaults: (wallDefaults) => set({ wallDefaults }),
   setAlignmentGuides: (alignmentGuides) => set({ alignmentGuides }),
+  setPlacedFurnitureKind: (placedFurnitureKind) => set({ placedFurnitureKind, activeTool: 'furniture' }),
   resetView: () => set({ activeTool: 'select', selectedId: null, editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [] }),
 }));

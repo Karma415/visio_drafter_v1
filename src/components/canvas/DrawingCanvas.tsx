@@ -5,7 +5,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { isCenteredShape, isProportionalShape, nodePosition, normalizePoints, screenToWorld, snapToDrawingPointWithKind, snapToWallFace, snapToWallPoint, snapWallEndpoint, snappedBounds } from '../../domain/geometry';
 import type { ShapePoint } from '../../domain/document';
 import { WALL_DEFINITIONS } from '../../domain/walls';
-import { DEFAULT_FURNITURE_KIND, FURNITURE_DEFINITIONS } from '../../domain/furniture';
+import { FURNITURE_DEFINITIONS } from '../../domain/furniture';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { BASE_PIXELS_PER_MM, useEditorStore } from '../../store/useEditorStore';
 import { DrawingGrid } from './DrawingGrid';
@@ -204,13 +204,14 @@ export function DrawingCanvas() {
       return;
     }
     try {
-      const furniture = activeTool === 'furniture' ? FURNITURE_DEFINITIONS[DEFAULT_FURNITURE_KIND] : null;
+      const placedKind = editor.placedFurnitureKind;
+      const furniture = activeTool === 'furniture' ? FURNITURE_DEFINITIONS[placedKind] : null;
       useDrawingStore.getState().addShape({
         type: activeTool, x: point.x, y: point.y,
         width: furniture?.defaultWidthMm ?? (activeTool === 'text' ? 1219.2 : 609.6),
         height: furniture?.defaultHeightMm ?? (activeTool === 'text' ? 254 : 609.6),
         fill: furniture?.color ?? (activeTool === 'text' ? '#111827' : activeTool === 'arc' ? '#1d4ed8' : activeTool === 'circle' || activeTool === 'ellipse' ? '#8b5cf6' : '#3b82f6'),
-        ...(furniture ? { furnitureKind: DEFAULT_FURNITURE_KIND } : {}),
+        ...(furniture ? { furnitureKind: placedKind } : {}),
         ...(activeTool === 'text' ? { text: 'Select and click Edit Text' } : {}),
         ...(activeTool === 'arc' ? { startAngle: 0, endAngle: 180 } : {}),
       });

@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { BASE_PIXELS_PER_MM, useEditorStore } from '../../store/useEditorStore';
 import type { ActiveTool } from '../../store/useEditorStore';
 import { DocumentSettings } from './DocumentSettings';
 import { FileControls } from './FileControls';
 import type { CommandTab } from './navigation';
+import type { FurnitureCategory } from '../../domain/furniture';
+import { FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
 
 const TOOLS: { id: ActiveTool; label: string }[] = [
   { id: 'select', label: 'Select / pan' }, { id: 'line', label: 'Line' },
@@ -32,16 +35,60 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   const scale = useEditorStore((state) => state.scale);
   const error = useEditorStore((state) => state.error);
   const snapStatus = useEditorStore((state) => state.snapStatus);
+  const placedFurnitureKind = useEditorStore((state) => state.placedFurnitureKind);
+  const [furnitureCategory, setFurnitureCategory] = useState<FurnitureCategory>('furniture');
+
   const tools = TOOLS.filter((tool) => TAB_TOOLS[activeTab].includes(tool.id));
+  const categoryFurnitureKinds = FURNITURE_KINDS.filter(
+    (kind) => FURNITURE_DEFINITIONS[kind].category === furnitureCategory,
+  );
+
   return <aside className="sidebar" aria-label="Drawing tools and properties">
     <h1>Karma's apartment draft</h1>
     <p className="muted">Actual measurements in inches · drawing scale 1:25</p>
     {error && <div role="alert" className="error">{error}<button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().reportError(null)}>Dismiss</button></div>}
     {warning && <div role="alert" className="error"><p>{warning}</p>
       <button type="button" className="btn-warning" onClick={() => useDrawingStore.getState().enableRecovery()}>Resume recovery — replace saved copy</button></div>}
-    {(tools.length > 0 || activeTab === 'view') && <section aria-label="Tools">{tools.length > 0 && <div className="tool-grid">{tools.map((tool) =>
-      <button key={tool.id} type="button" className="tool-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>{tool.label}</button>,
-    )}</div>}
+    {(tools.length > 0 || activeTab === 'view' || activeTab === 'furniture') && <section aria-label="Tools">
+      {activeTab === 'furniture' ? (
+        <>
+          <div className="sub-category-tabs" role="tablist" aria-label="Furniture category">
+            {FURNITURE_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                className="sub-tab-btn"
+                aria-selected={furnitureCategory === category.id}
+                onClick={() => setFurnitureCategory(category.id)}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+          <div className="tool-grid">
+            {categoryFurnitureKinds.map((kind) => {
+              const def = FURNITURE_DEFINITIONS[kind];
+              const isSelected = activeTool === 'furniture' && placedFurnitureKind === kind;
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  className="tool-btn"
+                  aria-pressed={isSelected}
+                  onClick={() => useEditorStore.getState().setPlacedFurnitureKind(kind)}
+                >
+                  {def.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : tools.length > 0 ? (
+        <div className="tool-grid">{tools.map((tool) =>
+          <button key={tool.id} type="button" className="tool-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>{tool.label}</button>,
+        )}</div>
+      ) : null}
       <div className="button-row"><button type="button" className="btn-secondary" disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>
         <button type="button" className="btn-secondary" disabled={!canRedo} onClick={() => useDrawingStore.getState().redo()}>Redo</button>
         <button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().resetView()}>Reset view</button></div>

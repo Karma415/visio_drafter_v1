@@ -108,7 +108,21 @@ try {
   await clickButton('Line');
   await clickCanvas(canvasX(0.32), y + 680); await key('Escape', 27);
   assert.equal(await evaluate(`document.body.innerText.includes('Click the second point to finish the line.')`), false);
-  console.log('PASS live DOM selection, handles, wall, saved measure, Enter/double-click path completion, and Escape cancellation');
+
+  await clickButton('Furniture');
+  await clickButton('Electronics');
+  await clickButton('TV / Media unit');
+  await clickCanvas(canvasX(0.2), y + 250);
+  await waitFor(`document.body.innerText.includes('Selected furniture')`, 'tv unit selection');
+  await waitFor(`document.querySelector('select').value === 'tv_unit'`, 'tv unit select value');
+
+  await clickButton('Appliances');
+  await clickButton('Washer / Dryer');
+  await clickCanvas(canvasX(0.2), y + 400);
+  await waitFor(`document.body.innerText.includes('Selected furniture')`, 'washer dryer selection');
+  await waitFor(`document.querySelector('select').value === 'washer_dryer'`, 'washer dryer select value');
+
+  console.log('PASS live DOM selection, handles, wall, saved measure, furniture/electronics/appliances tabs, Enter/double-click path completion, and Escape cancellation');
 } finally {
   await command('Browser.close').catch(() => {});
   browser.kill();

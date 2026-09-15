@@ -5,7 +5,7 @@ import { useDrawingStore } from '../../store/useDrawingStore';
 import { WALL_DEFINITIONS, WALL_TYPES } from '../../domain/walls';
 import { useEditorStore } from '../../store/useEditorStore';
 import { wallLength as getWallLength } from '../../domain/geometry';
-import { DEFAULT_FURNITURE_KIND, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
+import { DEFAULT_FURNITURE_KIND, FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
 
 interface Props { shape: Shape; unit: 'mm' | 'cm' }
 export function MeasurementPanel({ shape, unit }: Props) {
@@ -77,7 +77,15 @@ export function MeasurementPanel({ shape, unit }: Props) {
         setFurnitureKind(next);
         setWidth(String(Number(mmToInches(definition.defaultWidthMm).toFixed(8))));
         setHeight(String(Number(mmToInches(definition.defaultHeightMm).toFixed(8))));
-      }}>{FURNITURE_KINDS.map((kind) => <option key={kind} value={kind}>{FURNITURE_DEFINITIONS[kind].label}</option>)}</select></label>}
+      }}>
+        {FURNITURE_CATEGORIES.map((category) => (
+          <optgroup key={category.id} label={category.label}>
+            {FURNITURE_KINDS.filter((k) => FURNITURE_DEFINITIONS[k].category === category.id).map((kind) => (
+              <option key={kind} value={kind}>{FURNITURE_DEFINITIONS[kind].label}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select></label>}
       <small>{shape.type === 'wall' ? 'Length preserves the wall’s first endpoint and direction. ' : isPath ? 'For paths, width and height scale the existing points. ' : ''}Decimals or fractions work, for example 12 3/8.</small>
       {error && <p role="alert" className="error">{error}</p>}
       <button type="submit" className="btn-primary">Apply properties</button>
