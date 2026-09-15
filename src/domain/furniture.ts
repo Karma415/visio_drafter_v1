@@ -65,7 +65,7 @@ export const FURNITURE_DEFINITIONS: Record<FurnitureKind, FurnitureDefinition> =
   desk_chair: { label: 'Desk chair', category: 'furniture', defaultWidthMm: 609.6, defaultHeightMm: 609.6, color: '#34d399' },
   console_table: { label: 'Console table', category: 'furniture', defaultWidthMm: 1066.8, defaultHeightMm: 355.6, color: '#f59e0b' },
   wall_shelf: { label: 'Wall shelf', category: 'furniture', defaultWidthMm: 914.4, defaultHeightMm: 254, color: '#ca8a04' },
-  tv_unit: { label: 'TV / Media unit', category: 'electronics', defaultWidthMm: 1219.2, defaultHeightMm: 355.6, color: '#64748b' },
+  tv_unit: { label: 'TV / Media unit', category: 'electronics', defaultWidthMm: 1270, defaultHeightMm: 88.9, color: '#64748b' },
   refrigerator: { label: 'Refrigerator', category: 'appliances', defaultWidthMm: 914.4, defaultHeightMm: 812.8, color: '#64748b' },
   stove: { label: 'Stove / Range', category: 'appliances', defaultWidthMm: 762, defaultHeightMm: 711.2, color: '#64748b' },
   washer_dryer: { label: 'Washer / Dryer', category: 'appliances', defaultWidthMm: 685.8, defaultHeightMm: 685.8, color: '#64748b' },

@@ -38,6 +38,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   const error = useEditorStore((state) => state.error);
   const snapStatus = useEditorStore((state) => state.snapStatus);
   const placedFurnitureKind = useEditorStore((state) => state.placedFurnitureKind);
+  const placedDoorType = useEditorStore((state) => state.placedDoorType);
   const [furnitureCategory, setFurnitureCategory] = useState<FurnitureCategory>('furniture');
 
   const tools = TOOLS.filter((tool) => TAB_TOOLS[activeTab].includes(tool.id));
@@ -79,10 +80,11 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
                   type="button"
                   className="library-tile-btn"
                   aria-pressed={isSelected}
+                  title={def.label}
+                  aria-label={def.label}
                   onClick={() => useEditorStore.getState().setPlacedFurnitureKind(kind)}
                 >
-                  <ToolIcon tool="furniture" size={24} />
-                  <span className="library-tile-label">{def.label}</span>
+                  <ToolIcon tool="furniture" size={28} />
                 </button>
               );
             })}
@@ -96,50 +98,57 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
               type="button"
               className="library-tile-btn"
               aria-pressed={activeTool === 'door'}
-              title="Door (Click to place on wall)"
+              title="Door"
+              aria-label="Door"
               onClick={() => {
                 useEditorStore.getState().setTool('door');
                 useEditorStore.getState().setPlacedDoorType('single_door');
               }}
             >
               <DoorIcon size={34} />
-              <span className="library-tile-label">Door</span>
             </button>
 
             <button
               type="button"
               className="library-tile-btn"
               aria-pressed={activeTool === 'window'}
-              title="Window (Click to place on wall)"
+              title="Window"
+              aria-label="Window"
               onClick={() => {
                 useEditorStore.getState().setTool('window');
                 useEditorStore.getState().setPlacedWindowType('standard_window');
               }}
             >
               <WindowIcon size={34} />
-              <span className="library-tile-label">Window</span>
             </button>
 
             <button
               type="button"
               className="library-tile-btn"
-              aria-pressed={activeTool === 'door'}
-              title="Opening (Cased wall walkthrough)"
+              aria-pressed={activeTool === 'door' && placedDoorType === 'single_door'}
+              title="Opening"
+              aria-label="Opening"
               onClick={() => {
                 useEditorStore.getState().setTool('door');
                 useEditorStore.getState().setPlacedDoorType('single_door');
               }}
             >
               <OpeningIcon size={34} />
-              <span className="library-tile-label">Opening</span>
             </button>
           </div>
         </>
       ) : tools.length > 0 ? (
         <div className="library-grid">{tools.map((tool) =>
-          <button key={tool.id} type="button" className="library-tile-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>
-            <ToolIcon tool={tool.id} size={24} />
-            <span className="library-tile-label">{tool.label}</span>
+          <button
+            key={tool.id}
+            type="button"
+            className="library-tile-btn"
+            aria-pressed={activeTool === tool.id}
+            title={tool.label}
+            aria-label={tool.label}
+            onClick={() => useEditorStore.getState().setTool(tool.id)}
+          >
+            <ToolIcon tool={tool.id} size={28} />
           </button>,
         )}</div>
       ) : null}

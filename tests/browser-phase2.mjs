@@ -45,7 +45,7 @@ try {
     assert.fail(`Timed out: ${label}; body: ${await evaluate('document.body.innerText')}`);
   };
   const clickButton = async (label) => {
-    await evaluate(`Array.from(document.querySelectorAll('button')).find((button) => button.textContent === ${JSON.stringify(label)})?.click()`);
+    await evaluate(`Array.from(document.querySelectorAll('button')).find((button) => (button.textContent?.trim() === ${JSON.stringify(label)} && button.textContent?.trim() !== '') || button.getAttribute('title') === ${JSON.stringify(label)} || button.getAttribute('aria-label') === ${JSON.stringify(label)})?.click()`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   };
   const canvasBounds = async () => JSON.parse(await evaluate(`JSON.stringify(document.querySelector('.drawing-canvas').getBoundingClientRect().toJSON())`));

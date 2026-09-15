@@ -1,4 +1,4 @@
-import { Circle, Ellipse, Line, Rect } from 'react-konva';
+import { Circle, Ellipse, Group, Line, Rect } from 'react-konva';
 import type { Shape } from '../../domain/document';
 
 interface Props { shape: Shape; selected: boolean; scale: number }
@@ -121,13 +121,16 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
 
     case 'floor_cabinet': {
       const frontOverhang = Math.min(height * 0.12, 50);
+      const bodyH = height - frontOverhang;
       return <>
-        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth}
-          fill={fill} />
-        <Line points={[0, height - frontOverhang, width, height - frontOverhang]}
-          stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
-        {width > 500 && <Line points={[width / 2, 0, width / 2, height - frontOverhang]}
-          stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />}
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+        {/* Traditional blueprint diagonal 'X' through base cabinet */}
+        <Line points={[0, 0, width, bodyH]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.65} listening={false} />
+        <Line points={[0, bodyH, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.65} listening={false} />
+        {/* Countertop front overhang line */}
+        <Line points={[0, bodyH, width, bodyH]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />
+        {/* Center split and door pulls */}
+        {width > 500 && <Line points={[width / 2, 0, width / 2, bodyH]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />}
         <Line points={[width * 0.2, height - frontOverhang * 0.5, width * 0.35, height - frontOverhang * 0.5]}
           stroke={stroke} strokeWidth={subStrokeWidth * 1.5} listening={false} />
         {width > 500 && <Line points={[width * 0.65, height - frontOverhang * 0.5, width * 0.8, height - frontOverhang * 0.5]}
@@ -138,12 +141,11 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
     case 'wall_cabinet': {
       const dash = [6 / scale, 4 / scale];
       return <>
-        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth}
-          fill={fill} dash={dash} />
-        {width > 500 && <Line points={[width / 2, 0, width / 2, height]}
-          stroke={subStroke} strokeWidth={subStrokeWidth} dash={dash} listening={false} />}
-        <Line points={[width * 0.1, height * 0.5, width * 0.9, height * 0.5]}
-          stroke={subStroke} strokeWidth={subStrokeWidth} dash={dash} listening={false} />
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} dash={dash} />
+        {/* Diagonal line through upper cabinet */}
+        <Line points={[0, 0, width, height]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.6} listening={false} />
+        <Line points={[0, height, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.6} listening={false} />
+        {width > 500 && <Line points={[width / 2, 0, width / 2, height]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={dash} listening={false} />}
       </>;
     }
 
@@ -167,25 +169,32 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
     case 'tall_cabinet': {
       return <>
         <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
-        <Line points={[0, 0, width, height]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
-        <Line points={[0, height, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
+        <Line points={[0, 0, width, height]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[5 / scale, 4 / scale]} opacity={0.7} listening={false} />
+        <Line points={[0, height, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[5 / scale, 4 / scale]} opacity={0.7} listening={false} />
         {width > 500 && <Line points={[width / 2, 0, width / 2, height]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />}
       </>;
     }
 
     case 'tv_unit': {
-      const screenW = Math.min(width * 0.82, 1800);
-      const screenThick = Math.min(height * 0.16, 45);
-      const screenX = (width - screenW) / 2;
-      const screenY = height * 0.32;
-      const standW = Math.min(screenW * 0.4, 250);
+      const frameCorner = Math.min(width, height) * 0.08;
+      const bracketW = Math.min(width * 0.35, 300);
+      const bracketH = Math.min(height * 0.3, 20);
+      const inset = Math.max(1, 1.5 / scale);
       return <>
+        {/* Wall mount bracket behind screen */}
+        <Rect x={(width - bracketW) / 2} y={-bracketH} width={bracketW} height={bracketH + height * 0.5}
+          stroke={subStroke} strokeWidth={subStrokeWidth} fill="#475569" cornerRadius={1} listening={false} />
+        {/* Flat Screen Frame */}
         <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth}
-          fill={fill} cornerRadius={Math.min(width, height) * 0.05} />
-        <Rect x={(width - standW) / 2} y={screenY + screenThick} width={standW} height={Math.min(height * 0.22, 60)}
-          stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={2} listening={false} />
-        <Rect x={screenX} y={screenY} width={screenW} height={screenThick}
-          stroke={stroke} strokeWidth={strokeWidth} fill="#1e293b" cornerRadius={2} listening={false} />
+          fill="#0f172a" cornerRadius={frameCorner} />
+        {/* Screen Glass Surface */}
+        <Rect x={inset} y={inset}
+          width={Math.max(1, width - 2 * inset)}
+          height={Math.max(1, height - 2 * inset)}
+          stroke={subStroke} strokeWidth={subStrokeWidth} fill="#1e293b" cornerRadius={Math.max(0, frameCorner - 1)} listening={false} />
+        {/* Screen horizontal indicator */}
+        <Line points={[width * 0.08, height * 0.5, width * 0.92, height * 0.5]}
+          stroke={subStroke} strokeWidth={Math.max(1 / scale, 0.75)} opacity={0.6} listening={false} />
       </>;
     }
 
@@ -316,15 +325,22 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
     }
 
     case 'refrigerator': {
-      const doorH = Math.min(height * 0.18, 120);
-      const handleW = width * 0.35;
+      const doorDepth = Math.min(height * 0.18, 120);
+      const bodyH = Math.max(10, height - doorDepth);
+      const handleW = width * 0.65;
       const corner = Math.min(width, height) * 0.03;
-      return <>
-        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={corner} />
-        <Rect x={0} y={height - doorH} width={width} height={doorH} stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={[0, 0, corner, corner]} listening={false} />
-        <Line points={[width * 0.5 - handleW * 0.5, height - doorH * 0.5, width * 0.5 + handleW * 0.5, height - doorH * 0.5]} stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} listening={false} />
-        <Line points={[width * 0.5, height - doorH, width * 0.5, height]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
-      </>;
+      return <Group>
+        {/* Main fridge body box */}
+        <Rect width={width} height={bodyH} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={[corner, corner, 0, 0]} />
+        {/* Secondary front door section */}
+        <Rect x={0} y={bodyH} width={width} height={doorDepth} stroke={stroke} strokeWidth={strokeWidth} fill={subFill} cornerRadius={[0, 0, corner, corner]} listening={false} />
+        {/* Door handle / split line */}
+        <Line points={[width * 0.5, bodyH, width * 0.5, height]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
+        <Line points={[(width - handleW) / 2, bodyH + doorDepth * 0.5, (width + handleW) / 2, bodyH + doorDepth * 0.5]}
+          stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} lineCap="round" listening={false} />
+        {/* Subtle interior shelf indicator */}
+        <Line points={[width * 0.08, bodyH * 0.5, width * 0.92, bodyH * 0.5]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.5} listening={false} />
+      </Group>;
     }
 
     case 'stove': {
