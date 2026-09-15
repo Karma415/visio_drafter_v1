@@ -340,10 +340,13 @@ test('saved tape measurements validate and survive export/import like other draw
 });
 
 test('furniture uses approved kinds and keeps real-world editable dimensions through export', () => {
-  const furniture = { ...shape, id: 'bed', type: 'furniture', furnitureKind: 'bed', width: FURNITURE_DEFINITIONS.bed.defaultWidthMm, height: FURNITURE_DEFINITIONS.bed.defaultHeightMm, fill: FURNITURE_DEFINITIONS.bed.color };
-  assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [furniture] })).shapes[0], furniture);
-  assert.equal(FURNITURE_KINDS.length, 4);
-  assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...furniture, furnitureKind: 'unknown' }] })));
+  assert.equal(FURNITURE_KINDS.length, 17);
+  for (const kind of FURNITURE_KINDS) {
+    const def = FURNITURE_DEFINITIONS[kind];
+    const furniture = { ...shape, id: `test-${kind}`, type: 'furniture', furnitureKind: kind, width: def.defaultWidthMm, height: def.defaultHeightMm, fill: def.color };
+    assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [furniture] })).shapes[0], furniture);
+  }
+  assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...shape, type: 'furniture', furnitureKind: 'unknown' }] })));
 });
 
 test('alignment guides detect edge and center alignments between dragged shape and targets', () => {
