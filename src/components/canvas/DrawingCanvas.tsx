@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Line, Transformer } from 'react-konva';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { isCenteredShape, isProportionalShape, nodePosition, normalizePoints, screenToWorld, snapToDrawingPointWithKind, snapToWallFace, snapToWallPoint, snapWallEndpoint, snappedBounds } from '../../domain/geometry';
-import type { ShapePoint } from '../../domain/document';
+import { isCenteredShape, isProportionalShape, nodePosition, normalizePoints, screenToWorld, snapOpeningOrigin, snapToDrawingPointWithKind, snapToWallFace, snapToWallPoint, snapWallEndpoint, snappedBounds } from '../../domain/geometry';
+import type { Shape, ShapePoint } from '../../domain/document';
 import { WALL_DEFINITIONS } from '../../domain/walls';
 import { FURNITURE_DEFINITIONS } from '../../domain/furniture';
 import { OPENING_DEFINITIONS } from '../../domain/doors';
@@ -14,6 +14,13 @@ import { ShapeView } from './ShapeView';
 import type { ShapeNode } from './ShapeView';
 import { MeasurementOverlay } from './MeasurementOverlay';
 import { AlignmentGuides } from './AlignmentGuides';
+
+function shapeLayerOrder(shape: Shape): number {
+  if (shape.type === 'door' || shape.type === 'window') return 1;
+  if (shape.type === 'furniture') return 2;
+  if (shape.type === 'text' || shape.type === 'measurement') return 3;
+  return 0;
+}
 
 export function DrawingCanvas() {
   const container = useRef<HTMLDivElement | null>(null);
@@ -225,9 +232,31 @@ export function DrawingCanvas() {
         ?? windowDef?.color
         ?? (activeTool === 'text' ? '#111827' : activeTool === 'arc' ? '#1d4ed8' : activeTool === 'circle' || activeTool === 'ellipse' ? '#8b5cf6' : '#3b82f6');
 
+      let placeX = point.x;
+      let placeY = point.y;
+      let placeHeight = height;
+      let placeRotation = 0;
+      let finalKind = snapResult.kind;
+
+      if ((activeTool === 'door' || activeTool === 'window') && !event.evt.altKey) {
+        const openingSnap = snapOpeningOrigin(
+          { x: point.x, y: point.y },
+          { id: 'temp', type: activeTool, x: point.x, y: point.y, width, height, fill },
+          document.shapes,
+          document.gridMm,
+          16 / scale,
+        );
+        placeX = openingSnap.point.x;
+        placeY = openingSnap.point.y;
+        if (openingSnap.rotation !== undefined) placeRotation = openingSnap.rotation;
+        if (openingSnap.height !== undefined) placeHeight = openingSnap.height;
+        finalKind = openingSnap.kind;
+      }
+
       useDrawingStore.getState().addShape({
-        type: activeTool, x: point.x, y: point.y,
-        width, height, fill,
+        type: activeTool, x: placeX, y: placeY,
+        width, height: placeHeight, fill,
+        ...(placeRotation ? { rotation: placeRotation } : {}),
         ...(furniture ? { furnitureKind: placedKind } : {}),
         ...(doorDef ? { doorType: editor.placedDoorType, swingHinge: 'left', swingDirection: 'inside' } : {}),
         ...(windowDef ? { windowType: editor.placedWindowType } : {}),
@@ -237,7 +266,7 @@ export function DrawingCanvas() {
       editor.setTool('select');
       const added = useDrawingStore.getState().document.shapes.at(-1);
       editor.select(added?.id ?? null);
-      editor.setSnapStatus(snapStatus(snapResult.kind));
+      editor.setSnapStatus(snapStatus(finalKind));
     } catch (error) { editor.reportError(error); }
   }
   function transformEnd() {
@@ -307,9 +336,11 @@ export function DrawingCanvas() {
       onMouseMove={pointerMove} onTouchMove={pointerMove} onDragMove={pan} onDragEnd={pan}>
       <DrawingGrid {...size} position={position} scale={scale} gridMm={document.gridMm} />
       <Layer>
-        {document.shapes.map((shape) => <ShapeView key={shape.id} shape={shape} gridMm={document.gridMm} unit={document.displayUnit}
-          selectable={activeTool === 'select'} selected={activeTool === 'select' && selectedId === shape.id}
-          scale={scale} register={register} />)}
+        {[...document.shapes]
+          .sort((a, b) => shapeLayerOrder(a) - shapeLayerOrder(b))
+          .map((shape) => <ShapeView key={shape.id} shape={shape} gridMm={document.gridMm} unit={document.displayUnit}
+            selectable={activeTool === 'select'} selected={activeTool === 'select' && selectedId === shape.id}
+            scale={scale} register={register} />)}
         {activeDraft && <Line points={draftPoints} closed={activeDraft.type === 'polygon'} stroke="#475569" strokeWidth={3 / scale} dash={[8 / scale, 8 / scale]} listening={false} />}
         {measurement && measurementEnd && <MeasurementOverlay start={measurement.start} end={measurementEnd}
           preview={true} scale={scale} unit={document.displayUnit} />}

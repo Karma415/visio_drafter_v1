@@ -359,6 +359,78 @@ export function snapShapeOrigin(origin: ShapePoint, draggedShape: Shape, shapes:
   return { point: { x: snap(origin.x, gridMm), y: snap(origin.y, gridMm) }, kind: 'grid' };
 }
 
+export function snapOpeningOrigin(origin: ShapePoint, draggedOpening: Shape, shapes: Shape[], gridMm: number, thresholdMm: number): SnapResult & { rotation?: number; height?: number } {
+  const width = draggedOpening.width;
+  const height = draggedOpening.height;
+  const currentRotation = draggedOpening.rotation ?? 0;
+  const currentRad = currentRotation * Math.PI / 180;
+  const centerX = origin.x + (width / 2) * Math.cos(currentRad) - (height / 2) * Math.sin(currentRad);
+  const centerY = origin.y + (width / 2) * Math.sin(currentRad) + (height / 2) * Math.cos(currentRad);
+
+  let bestResult: (SnapResult & { rotation?: number; height?: number }) | null = null;
+  let bestDistance = Infinity;
+
+  for (const shape of shapes) {
+    if (shape.id === draggedOpening.id || shape.type !== 'wall') continue;
+    const [start, end] = worldWallPoints(shape);
+    if (!start || !end) continue;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) continue;
+
+    const ux = dx / length;
+    const uy = dy / length;
+    const nx = -uy;
+    const ny = ux;
+    const thickness = shape.wallThicknessMm ?? 101.6;
+
+    // Check distance for both center and origin
+    const projCenter = (centerX - start.x) * ux + (centerY - start.y) * uy;
+    const clampedCenter = Math.max(0, Math.min(length, projCenter));
+    const closestCenter = { x: start.x + ux * clampedCenter, y: start.y + uy * clampedCenter };
+    const distCenter = Math.hypot(centerX - closestCenter.x, centerY - closestCenter.y);
+
+    const projOrigin = (origin.x - start.x) * ux + (origin.y - start.y) * uy;
+    const clampedOrigin = Math.max(0, Math.min(length, projOrigin));
+    const closestOrigin = { x: start.x + ux * clampedOrigin, y: start.y + uy * clampedOrigin };
+    const distOrigin = Math.hypot(origin.x - closestOrigin.x, origin.y - closestOrigin.y);
+
+    const distance = Math.min(distCenter, distOrigin);
+    const chosenProj = distCenter <= distOrigin ? projCenter : projOrigin + width / 2;
+
+    const effectiveThreshold = Math.max(thresholdMm, thickness * 1.5);
+    if (distance <= effectiveThreshold && distance < bestDistance) {
+      bestDistance = distance;
+      const centerAlong = length >= width
+        ? Math.max(width / 2, Math.min(length - width / 2, chosenProj))
+        : length / 2;
+
+      const pStartX = start.x + ux * (centerAlong - width / 2);
+      const pStartY = start.y + uy * (centerAlong - width / 2);
+
+      const snappedOrigin = {
+        x: pStartX - nx * (thickness / 2),
+        y: pStartY - ny * (thickness / 2),
+      };
+
+      const wallAngleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) % 360 + 360) % 360;
+      const diff1 = Math.abs((((currentRotation - wallAngleDeg) % 360) + 540) % 360 - 180);
+      const diff2 = Math.abs((((currentRotation - (wallAngleDeg + 180)) % 360) + 540) % 360 - 180);
+      const targetRotation = diff2 < diff1 ? (wallAngleDeg + 180) % 360 : wallAngleDeg;
+
+      bestResult = {
+        point: snappedOrigin,
+        rotation: Math.round(targetRotation * 100) / 100,
+        height: thickness,
+        kind: 'wall',
+      };
+    }
+  }
+
+  return bestResult ?? snapShapeOrigin(origin, draggedOpening, shapes, gridMm, thresholdMm);
+}
+
 /** Move a whole wall so either endpoint joins another wall's centerline. */
 export function snapWallOrigin(origin: ShapePoint, draggedWall: Shape, shapes: Shape[], gridMm: number, thresholdMm: number): SnapResult {
   const localEndpoints = worldWallPoints({ ...draggedWall, x: 0, y: 0 });

@@ -52,14 +52,19 @@ try {
   const shapes = () => evaluate(`(await import('/src/store/useDrawingStore.ts')).useDrawingStore.getState().document.shapes`);
   const editor = () => evaluate(`(await import('/src/store/useEditorStore.ts')).useEditorStore.getState()`);
   const button = async (label) => {
-    await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+    await evaluate(`(() => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === ${JSON.stringify(label)} || b.innerText?.trim() === ${JSON.stringify(label)} || b.textContent?.includes(${JSON.stringify(label)}) || b.getAttribute('title') === ${JSON.stringify(label)} || b.getAttribute('aria-label') === ${JSON.stringify(label)});
+      if (btn) {
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+    })()`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   };
+  await button('Tools');
   await button('Rectangle');
   const bounds = await evaluate(`JSON.stringify(document.querySelector('.drawing-canvas').getBoundingClientRect().toJSON())`);
   const { x, y } = JSON.parse(bounds);
   async function click(px, py) {
-    await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: px, y: py }, sessionId);
     await command('Input.dispatchMouseEvent', { type: 'mousePressed', x: px, y: py, button: 'left', clickCount: 1 }, sessionId);
     await command('Input.dispatchMouseEvent', { type: 'mouseReleased', x: px, y: py, button: 'left', clickCount: 1 }, sessionId);
     await new Promise((resolve) => setTimeout(resolve, 150));

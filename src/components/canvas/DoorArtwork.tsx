@@ -27,14 +27,18 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
     const sillOverhang = Math.min(width * 0.04, 30);
     const sillH = Math.min(height * 0.25, 25);
     const glassInset = Math.min(height * 0.28, 30);
+    const windowMask = (
+      <Rect x={0} y={-1} width={width} height={height + 2} fill={fill} strokeEnabled={false} />
+    );
 
     switch (shape.windowType ?? 'standard_window') {
       case 'large_window': {
         const paneW = openingW / 3;
         return <>
+          {windowMask}
           <Rect x={-sillOverhang} y={height} width={width + 2 * sillOverhang} height={sillH}
             stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} cornerRadius={2} />
-          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill="transparent" />
           <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Line points={[jambW + paneW, 0, jambW + paneW, height]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />
@@ -48,9 +52,10 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
         const paneW = openingW * 0.55;
         const cy = height * 0.5;
         return <>
+          {windowMask}
           <Rect x={-sillOverhang} y={height} width={width + 2 * sillOverhang} height={sillH}
             stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} cornerRadius={2} />
-          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill="transparent" />
           <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Rect x={jambW} y={cy - glassInset} width={paneW} height={glassInset} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill(selected)} listening={false} />
@@ -61,9 +66,10 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
       case 'standard_window':
       default: {
         return <>
+          {windowMask}
           <Rect x={-sillOverhang} y={height} width={width + 2 * sillOverhang} height={sillH}
             stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} cornerRadius={2} />
-          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+          <Rect x={0} y={0} width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill="transparent" />
           <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={subStrokeWidth} fill={jambFill} listening={false} />
           <Line points={[jambW, glassInset, width - jambW, glassInset]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
@@ -79,7 +85,7 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
   const doorThickness = Math.min(openingW * 0.05, 38);
 
   const openingRect = (
-    <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+    <Rect x={0} y={-1} width={width} height={height + 2} fill={fill} strokeEnabled={false} />
   );
   const arcFill = selected ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.08)';
 

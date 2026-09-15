@@ -25,7 +25,7 @@ const storage = new MemoryStorage();
 Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
 const { createDocument } = await import('../src/domain/document.ts');
 const { inchesToMm, mmToInches, paperMm, parseInches } = await import('../src/domain/units.ts');
-const { distanceBetween, findAlignmentGuides, resizeWallToLength, snap, screenToWorld, snapShapeOrigin, snapToDrawingPoint, snapToWallFace, snapToWallPoint, snapWallEndpoint, snapWallOrigin, visibleGridStep, nodePosition, normalizePoints, resizePoints, snappedBounds, wallLength } = await import('../src/domain/geometry.ts');
+const { distanceBetween, findAlignmentGuides, resizeWallToLength, snap, screenToWorld, snapOpeningOrigin, snapShapeOrigin, snapToDrawingPoint, snapToWallFace, snapToWallPoint, snapWallEndpoint, snapWallOrigin, visibleGridStep, nodePosition, normalizePoints, resizePoints, snappedBounds, wallLength } = await import('../src/domain/geometry.ts');
 const { decodeDrawing, encodeDrawing } = await import('../src/services/drawingFiles.ts');
 const { loadRecovery, saveRecovery } = await import('../src/services/recovery.ts');
 const { useDrawingStore } = await import('../src/store/useDrawingStore.ts');
@@ -391,5 +391,67 @@ test('alignment guides detect edge and center alignments between dragged shape a
   // 1D alignment snapping snaps X when near target edge while Y falls back to grid
   const snapResult = snapShapeOrigin({ x: 196, y: 403 }, dragged, [target], 25, 12);
   assert.deepEqual(snapResult, { point: { x: 200, y: 400 }, kind: 'object' });
+});
+
+test('snapOpeningOrigin snaps doors and windows to walls with matching angle, thickness, and centerline offset', () => {
+  const wall = {
+    ...shape,
+    id: 'test-wall-1',
+    type: 'wall',
+    x: 1000,
+    y: 2000,
+    width: 4000,
+    height: 1,
+    points: [{ x: 0, y: 0 }, { x: 4000, y: 0 }],
+    wallType: 'interior_partition',
+    wallThicknessMm: 150,
+  };
+
+  const door = {
+    ...shape,
+    id: 'test-door-1',
+    type: 'door',
+    doorType: 'single_door',
+    x: 0,
+    y: 0,
+    width: 900,
+    height: 100,
+    rotation: 0,
+  };
+
+  // Door dragged near wall center (x: 2500, y: 2010)
+  const result = snapOpeningOrigin({ x: 2050, y: 1960 }, door, [wall], 25, 20);
+  assert.equal(result.kind, 'wall');
+  assert.equal(result.rotation, 0);
+  assert.equal(result.height, 150);
+  // Y origin should be wall centerline (2000) - thickness/2 (75) = 1925
+  close(result.point.y, 1925);
+  // X origin should place door along wall
+  close(result.point.x, 2050);
+
+  // Door dragged onto a vertical wall from (5000, 1000) to (5000, 5000)
+  const verticalWall = {
+    ...shape,
+    id: 'test-wall-v',
+    type: 'wall',
+    x: 5000,
+    y: 1000,
+    width: 1,
+    height: 4000,
+    points: [{ x: 0, y: 0 }, { x: 0, y: 4000 }],
+    wallType: 'exterior_brick',
+    wallThicknessMm: 200,
+  };
+
+  const vResult = snapOpeningOrigin({ x: 4950, y: 2500 }, door, [verticalWall], 25, 20);
+  assert.equal(vResult.kind, 'wall');
+  assert.equal(vResult.rotation, 90);
+  assert.equal(vResult.height, 200);
+  // Centerline at x=5000, normal is (-1, 0), so x origin is 5000 - (-1)*100 = 5100
+  close(vResult.point.x, 5100);
+
+  // When far from any wall, falls back to grid/shape snap
+  const farResult = snapOpeningOrigin({ x: 113, y: 113 }, door, [wall], 25, 5);
+  assert.equal(farResult.kind, 'grid');
 });
 

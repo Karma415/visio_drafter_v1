@@ -3,7 +3,7 @@ import { Arc, Ellipse, Group, Line, Rect, RegularPolygon, Text } from 'react-kon
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Shape } from '../../domain/document';
-import { distanceBetween, findAlignmentGuides, isCenteredShape, nodePosition, snapShapeOrigin, snapWallOrigin } from '../../domain/geometry';
+import { distanceBetween, findAlignmentGuides, isCenteredShape, nodePosition, snapOpeningOrigin, snapShapeOrigin, snapWallOrigin } from '../../domain/geometry';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { WALL_DEFINITIONS } from '../../domain/walls';
@@ -46,18 +46,27 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     const offset = isCenteredShape(shape) ? { x: shape.width / 2, y: shape.height / 2 } : { x: 0, y: 0 };
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
     const editorScale = useEditorStore.getState().scale;
+    const isOpening = shape.type === 'door' || shape.type === 'window';
     const snapResult = event.evt.altKey
       ? { point: raw, kind: 'free' as const }
       : shape.type === 'wall'
         ? snapWallOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale)
-        : snapShapeOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale);
-    const next = { ...shape, ...snapResult.point };
+        : isOpening
+          ? snapOpeningOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale)
+          : snapShapeOrigin(raw, shape, useDrawingStore.getState().document.shapes, gridMm, 16 / editorScale);
+    const rot = 'rotation' in snapResult && typeof snapResult.rotation === 'number' ? snapResult.rotation : undefined;
+    const h = 'height' in snapResult && typeof snapResult.height === 'number' ? snapResult.height : undefined;
+    const nextRotation = rot !== undefined ? rot : (shape.rotation ?? 0);
+    const nextHeight = h !== undefined ? h : shape.height;
+    const next = { ...shape, ...snapResult.point, height: nextHeight, rotation: nextRotation };
     try {
-      useDrawingStore.getState().updateBounds(shape.id, { x: next.x, y: next.y, width: shape.width, height: shape.height });
+      useDrawingStore.getState().updateGeometry(shape.id, { x: next.x, y: next.y, width: shape.width, height: next.height }, { rotation: next.rotation });
       node.position(nodePosition(next));
+      node.rotation(next.rotation);
       useEditorStore.getState().setSnapStatus(snapResult.kind === 'free' ? 'Free placement (Alt)' : snapResult.kind === 'wall' ? 'Wall join snap' : snapResult.kind === 'object' ? 'Object snap' : 'Grid snap');
     } catch (error) {
       node.position(nodePosition(shape));
+      node.rotation(shape.rotation ?? 0);
       useEditorStore.getState().reportError(error);
     }
   }
@@ -73,12 +82,18 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     }
     const editorScale = useEditorStore.getState().scale;
     const shapes = useDrawingStore.getState().document.shapes;
+    const isOpening = shape.type === 'door' || shape.type === 'window';
     const snapResult = shape.type === 'wall'
       ? snapWallOrigin(raw, shape, shapes, gridMm, 16 / editorScale)
-      : snapShapeOrigin(raw, shape, shapes, gridMm, 16 / editorScale);
+      : isOpening
+        ? snapOpeningOrigin(raw, shape, shapes, gridMm, 16 / editorScale)
+        : snapShapeOrigin(raw, shape, shapes, gridMm, 16 / editorScale);
     node.position(nodePosition({ ...shape, ...snapResult.point }));
+    if ('rotation' in snapResult && typeof snapResult.rotation === 'number') {
+      node.rotation(snapResult.rotation);
+    }
     useEditorStore.getState().setSnapStatus(snapResult.kind === 'wall' ? 'Wall join snap' : snapResult.kind === 'object' ? 'Object snap' : 'Grid snap');
-    if (shape.type !== 'wall') {
+    if (shape.type !== 'wall' && !isOpening) {
       const guides = findAlignmentGuides(snapResult.point, shape, shapes, 0.5);
       useEditorStore.getState().setAlignmentGuides(guides);
     } else {
