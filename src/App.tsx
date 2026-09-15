@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DrawingCanvas } from './components/canvas/DrawingCanvas';
 import { CommandBar } from './components/editor/CommandBar';
+import { FloatingToolbar } from './components/editor/FloatingToolbar';
 import { InspectorPanel } from './components/editor/InspectorPanel';
 import { Sidebar } from './components/editor/Sidebar';
 import type { CommandTab } from './components/editor/navigation';
@@ -26,7 +27,10 @@ export default function App() {
       onTabChange={setActiveTab} onToggleLeft={() => setLeftOpen((open) => !open)} onToggleRight={() => setRightOpen((open) => !open)} />
     <div className="drafting-workspace">
       {leftOpen && <Sidebar recoveryStatus={recoveryStatus} activeTab={activeTab} />}
-      <DrawingCanvas />
+      <div className="canvas-container">
+        <FloatingToolbar />
+        <DrawingCanvas />
+      </div>
       {rightOpen && <InspectorPanel />}
     </div>
     {editingShape && <TextEditor key={editingShape.id} shape={editingShape} />}

@@ -64,7 +64,7 @@ try {
   const x = bounds.x;
   const y = bounds.y;
   const canvasX = (ratio) => x + bounds.width * ratio;
-  await clickButton('Rectangle');
+  await clickButton('Room');
   await clickCanvas(x + 180, y + 180);
   await waitFor(`document.body.innerText.includes('Selected rectangle')`, 'rectangle selection');
   await waitFor(`window.Konva.stages[0].findOne('Transformer').nodes().length === 1`, 'rectangle handles');
@@ -79,10 +79,9 @@ try {
     await clickCanvas(px, py);
     await waitFor(`document.body.innerText.includes(${JSON.stringify(selected)})`, `${tool} selection`);
   }
-  await clickButton('Line');
-  await clickCanvas(canvasX(0.64), y + 300); await clickCanvas(canvasX(0.82), y + 350);
-  await waitFor(`document.body.innerText.includes('Selected line')`, 'line completion');
-  await clickButton('Walls');
+  await clickButton('Connected line');
+  await clickCanvas(canvasX(0.64), y + 300); await clickCanvas(canvasX(0.82), y + 350); await key('Enter', 13);
+  await waitFor(`document.body.innerText.includes('Selected polyline')`, 'polyline completion');
   await clickButton('Wall');
   await clickCanvas(canvasX(0.68), y + 620); await clickCanvas(canvasX(0.88), y + 620);
   await waitFor(`document.body.innerText.includes('Selected wall')`, 'wall completion');
@@ -105,9 +104,9 @@ try {
   await command('Input.dispatchMouseEvent', { type: 'mousePressed', x: canvasX(0.72), y: y + 650, button: 'left', clickCount: 2 }, sessionId);
   await command('Input.dispatchMouseEvent', { type: 'mouseReleased', x: canvasX(0.72), y: y + 650, button: 'left', clickCount: 2 }, sessionId);
   await waitFor(`document.body.innerText.includes('Selected polyline')`, 'polyline double-click completion');
-  await clickButton('Line');
+  await clickButton('Wall');
   await clickCanvas(canvasX(0.32), y + 680); await key('Escape', 27);
-  assert.equal(await evaluate(`document.body.innerText.includes('Click the second point to finish the line.')`), false);
+  assert.equal(await evaluate(`document.body.innerText.includes('Click the second point to finish the wall.')`), false);
 
   await clickButton('Furniture');
   await clickButton('Electronics');
@@ -129,7 +128,7 @@ try {
   await waitFor(`document.querySelector('select').value === 'toilet'`, 'toilet select value');
 
   await clickButton('Walls');
-  await clickButton('Single door');
+  await clickButton('Door');
   await clickCanvas(canvasX(0.5), y + 600);
   await waitFor(`document.body.innerText.includes('Selected door')`, 'door selection');
   await waitFor(`document.body.innerText.includes('Hinge side')`, 'door inspector controls');

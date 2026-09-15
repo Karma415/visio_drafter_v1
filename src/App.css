@@ -55,6 +55,71 @@
   min-height: 0;
   flex: 1;
   overflow: hidden;
+  position: relative;
+}
+
+.canvas-container {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Floating Top-Center Drawing Toolbar */
+.floating-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(19, 25, 38, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--cad-border-subtle);
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.floating-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  color: var(--cad-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.floating-toolbar-btn:hover {
+  color: var(--cad-text-bright);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.floating-toolbar-btn[aria-pressed="true"] {
+  background: var(--cad-accent-primary);
+  border-color: var(--cad-accent-primary-hover);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+}
+
+.floating-toolbar-btn svg {
+  flex-shrink: 0;
 }
 
 /* Command Bar (Header) */
@@ -327,6 +392,73 @@
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin: 8px 0;
+}
+
+/* 2-Column Parametric Library Tiles Grid */
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+
+.library-tile-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  padding: 10px 6px;
+  background: var(--cad-bg-surface);
+  border: 1px solid var(--cad-border-subtle);
+  border-radius: 8px;
+  color: var(--cad-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.library-tile-btn:hover {
+  background: var(--cad-bg-surface-hover);
+  border-color: var(--cad-border-input);
+  color: var(--cad-text-bright);
+  transform: translateY(-1px);
+}
+
+.library-tile-btn[aria-pressed="true"] {
+  background: var(--cad-bg-surface-active);
+  border-color: var(--cad-accent-cyan);
+  color: var(--cad-text-bright);
+  box-shadow: 0 0 0 1px var(--cad-accent-cyan), 0 0 10px var(--cad-accent-glow);
+  font-weight: 600;
+}
+
+.library-tile-btn .component-icon,
+.library-tile-btn .tool-icon {
+  flex-shrink: 0;
+  color: currentColor;
+  transition: transform 0.15s ease;
+}
+
+.library-tile-btn:hover .component-icon,
+.library-tile-btn:hover .tool-icon {
+  transform: scale(1.05);
+  color: var(--cad-text-bright);
+}
+
+.library-tile-btn[aria-pressed="true"] .component-icon,
+.library-tile-btn[aria-pressed="true"] .tool-icon {
+  color: var(--cad-accent-cyan);
+}
+
+.library-tile-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  word-break: break-word;
 }
 
 .tool-btn {

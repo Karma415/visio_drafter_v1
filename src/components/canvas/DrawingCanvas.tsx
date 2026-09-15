@@ -220,12 +220,12 @@ export function DrawingCanvas() {
       const width = furniture?.defaultWidthMm
         ?? doorDef?.defaultWidthMm
         ?? windowDef?.defaultWidthMm
-        ?? (activeTool === 'text' ? 1219.2 : 609.6);
+        ?? (activeTool === 'text' ? 1219.2 : activeTool === 'rectangle' ? 3048 : 609.6);
 
       const height = furniture?.defaultHeightMm
         ?? doorDef?.defaultThicknessMm
         ?? windowDef?.defaultThicknessMm
-        ?? (activeTool === 'text' ? 254 : 609.6);
+        ?? (activeTool === 'text' ? 254 : activeTool === 'rectangle' ? 3048 : 609.6);
 
       const fill = furniture?.color
         ?? doorDef?.color
