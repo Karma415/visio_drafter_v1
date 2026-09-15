@@ -294,6 +294,161 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
       </>;
     }
 
+    case 'dresser': {
+      const corner = Math.min(width, height) * 0.03;
+      const pullMargin = width * 0.15;
+      const pullW = Math.min(width * 0.22, 160);
+      const isMultiColumn = width > 900;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={corner} />
+        <Line points={[0, height * 0.5, width, height * 0.5]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
+        {isMultiColumn ? <>
+          <Line points={[width * 0.5, 0, width * 0.5, height]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
+          <Line points={[width * 0.25 - pullW * 0.5, height * 0.25, width * 0.25 + pullW * 0.5, height * 0.25]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+          <Line points={[width * 0.75 - pullW * 0.5, height * 0.25, width * 0.75 + pullW * 0.5, height * 0.25]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+          <Line points={[width * 0.25 - pullW * 0.5, height * 0.75, width * 0.25 + pullW * 0.5, height * 0.75]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+          <Line points={[width * 0.75 - pullW * 0.5, height * 0.75, width * 0.75 + pullW * 0.5, height * 0.75]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+        </> : <>
+          <Line points={[pullMargin, height * 0.25, width - pullMargin, height * 0.25]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+          <Line points={[pullMargin, height * 0.75, width - pullMargin, height * 0.75]} stroke={stroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+        </>}
+      </>;
+    }
+
+    case 'refrigerator': {
+      const doorH = Math.min(height * 0.18, 120);
+      const handleW = width * 0.35;
+      const corner = Math.min(width, height) * 0.03;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={corner} />
+        <Rect x={0} y={height - doorH} width={width} height={doorH} stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={[0, 0, corner, corner]} listening={false} />
+        <Line points={[width * 0.5 - handleW * 0.5, height - doorH * 0.5, width * 0.5 + handleW * 0.5, height - doorH * 0.5]} stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} listening={false} />
+        <Line points={[width * 0.5, height - doorH, width * 0.5, height]} stroke={subStroke} strokeWidth={subStrokeWidth} listening={false} />
+      </>;
+    }
+
+    case 'stove': {
+      const consoleH = Math.min(height * 0.16, 100);
+      const cookH = height - consoleH;
+      const burnerR1 = Math.min(width, cookH) * 0.16;
+      const burnerR2 = Math.min(width, cookH) * 0.13;
+      const cy1 = consoleH + cookH * 0.3;
+      const cy2 = consoleH + cookH * 0.72;
+      const cx1 = width * 0.28;
+      const cx2 = width * 0.72;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
+        <Rect x={0} y={0} width={width} height={consoleH} stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Circle x={width * 0.2} y={consoleH * 0.5} radius={Math.min(consoleH * 0.25, 8)} fill={subStroke} listening={false} />
+        <Circle x={width * 0.4} y={consoleH * 0.5} radius={Math.min(consoleH * 0.25, 8)} fill={subStroke} listening={false} />
+        <Circle x={width * 0.6} y={consoleH * 0.5} radius={Math.min(consoleH * 0.25, 8)} fill={subStroke} listening={false} />
+        <Circle x={width * 0.8} y={consoleH * 0.5} radius={Math.min(consoleH * 0.25, 8)} fill={subStroke} listening={false} />
+        <Circle x={cx1} y={cy1} radius={burnerR1} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Circle x={cx2} y={cy1} radius={burnerR2} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Circle x={cx1} y={cy2} radius={burnerR2} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Circle x={cx2} y={cy2} radius={burnerR1} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+      </>;
+    }
+
+    case 'kitchen_sink': {
+      const margin = Math.min(width, height) * 0.08;
+      const dividerW = Math.min(width * 0.05, 30);
+      const isDual = width > 650;
+      const basinY = margin + Math.min(height * 0.15, 60);
+      const basinH = height - basinY - margin;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={Math.min(width, height) * 0.05} />
+        <Circle x={width * 0.5} y={margin + (basinY - margin) * 0.5} radius={Math.min(margin * 1.2, 14)} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Line points={[width * 0.5, margin * 0.5, width * 0.5, basinY + 8]} stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} listening={false} />
+        {isDual ? <>
+          {(() => {
+            const availW = width - 2 * margin - dividerW;
+            const singleW = availW / 2;
+            const b1x = margin;
+            const b2x = margin + singleW + dividerW;
+            const r = Math.min(singleW, basinH) * 0.15;
+            return <>
+              <Rect x={b1x} y={basinY} width={singleW} height={basinH} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={r} listening={false} />
+              <Circle x={b1x + singleW * 0.5} y={basinY + basinH * 0.5} radius={Math.min(singleW, basinH) * 0.12} stroke={subStroke} strokeWidth={subStrokeWidth} fill={fill} listening={false} />
+              <Rect x={b2x} y={basinY} width={singleW} height={basinH} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={r} listening={false} />
+              <Circle x={b2x + singleW * 0.5} y={basinY + basinH * 0.5} radius={Math.min(singleW, basinH) * 0.12} stroke={subStroke} strokeWidth={subStrokeWidth} fill={fill} listening={false} />
+            </>;
+          })()}
+        </> : <>
+          {(() => {
+            const bW = width - 2 * margin;
+            const r = Math.min(bW, basinH) * 0.15;
+            return <>
+              <Rect x={margin} y={basinY} width={bW} height={basinH} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={r} listening={false} />
+              <Circle x={width * 0.5} y={basinY + basinH * 0.5} radius={Math.min(bW, basinH) * 0.12} stroke={subStroke} strokeWidth={subStrokeWidth} fill={fill} listening={false} />
+            </>;
+          })()}
+        </>}
+      </>;
+    }
+
+    case 'bathroom_vanity': {
+      const margin = Math.min(width, height) * 0.1;
+      const rx = Math.max(10, (width - 2 * margin) * 0.38);
+      const ry = Math.max(10, (height - 2 * margin) * 0.35);
+      const cx = width * 0.5;
+      const cy = height * 0.55;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={4} />
+        <Ellipse x={cx} y={cy} radiusX={rx} radiusY={ry} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Circle x={cx} y={cy} radius={Math.min(rx, ry) * 0.22} stroke={subStroke} strokeWidth={subStrokeWidth} fill={fill} listening={false} />
+        <Circle x={cx} y={margin + 10} radius={6} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Line points={[cx, margin + 4, cx, cy - ry + 4]} stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} listening={false} />
+      </>;
+    }
+
+    case 'toilet': {
+      const tankH = Math.min(height * 0.28, 200);
+      const tankCorner = Math.min(width, tankH) * 0.15;
+      const bowlW = Math.min(width * 0.75, width - 20);
+      const bowlH = Math.max(10, height - tankH);
+      const bowlCenterY = tankH + bowlH * 0.48;
+      const rx = bowlW * 0.5;
+      const ry = bowlH * 0.48;
+      return <>
+        <Rect x={0} y={0} width={width} height={tankH} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={tankCorner} />
+        <Line points={[width * 0.15, tankH * 0.5, width * 0.3, tankH * 0.5]} stroke={subStroke} strokeWidth={Math.max(2 / scale, 1.8)} listening={false} />
+        <Ellipse x={width * 0.5} y={bowlCenterY} radiusX={rx} radiusY={ry} stroke={stroke} strokeWidth={strokeWidth} fill={fill} listening={false} />
+        <Ellipse x={width * 0.5} y={bowlCenterY + ry * 0.1} radiusX={rx * 0.72} radiusY={ry * 0.68} stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+      </>;
+    }
+
+    case 'bathtub': {
+      const corner = Math.min(width, height) * 0.04;
+      const rim = Math.min(width, height) * 0.08;
+      const innerW = width - 2 * rim;
+      const innerH = height - 2 * rim;
+      const innerCorner = Math.min(innerW, innerH) * 0.35;
+      const drainX = rim + innerW * 0.15;
+      const drainY = height * 0.5;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={corner} />
+        <Rect x={rim} y={rim} width={innerW} height={innerH} stroke={stroke} strokeWidth={subStrokeWidth} fill={subFill} cornerRadius={innerCorner} listening={false} />
+        <Circle x={drainX} y={drainY} radius={Math.min(innerW, innerH) * 0.08} stroke={subStroke} strokeWidth={subStrokeWidth} fill={fill} listening={false} />
+        <Line points={[rim * 0.5, drainY, rim + 10, drainY]} stroke={stroke} strokeWidth={Math.max(2.5 / scale, 2)} listening={false} />
+      </>;
+    }
+
+    case 'shower': {
+      const corner = Math.min(width, height) * 0.03;
+      const curb = Math.min(width, height) * 0.08;
+      const drainR = Math.min(width, height) * 0.06;
+      return <>
+        <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} cornerRadius={corner} />
+        <Rect x={curb} y={curb} width={width - 2 * curb} height={height - 2 * curb} stroke={subStroke} strokeWidth={subStrokeWidth} fill={subFill} listening={false} />
+        <Line points={[curb, curb, width - curb, height - curb]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} listening={false} />
+        <Line points={[width - curb, curb, curb, height - curb]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} listening={false} />
+        <Circle x={width * 0.5} y={height * 0.5} radius={drainR} stroke={stroke} strokeWidth={strokeWidth} fill={fill} listening={false} />
+        <Line points={[width * 0.5 - drainR, height * 0.5, width * 0.5 + drainR, height * 0.5]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />
+        <Line points={[width * 0.5, height * 0.5 - drainR, width * 0.5, height * 0.5 + drainR]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />
+      </>;
+    }
+
     case 'bed':
     default: {
       const headboardH = Math.min(height * 0.1, 150);

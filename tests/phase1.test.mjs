@@ -340,7 +340,7 @@ test('saved tape measurements validate and survive export/import like other draw
 });
 
 test('furniture uses approved kinds and keeps real-world editable dimensions through export', () => {
-  assert.equal(FURNITURE_KINDS.length, 17);
+  assert.equal(FURNITURE_KINDS.length, 25);
   for (const kind of FURNITURE_KINDS) {
     const def = FURNITURE_DEFINITIONS[kind];
     const furniture = { ...shape, id: `test-${kind}`, type: 'furniture', furnitureKind: kind, width: def.defaultWidthMm, height: def.defaultHeightMm, fill: def.color };

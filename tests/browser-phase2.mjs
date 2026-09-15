@@ -122,7 +122,13 @@ try {
   await waitFor(`document.body.innerText.includes('Selected furniture')`, 'washer dryer selection');
   await waitFor(`document.querySelector('select').value === 'washer_dryer'`, 'washer dryer select value');
 
-  console.log('PASS live DOM selection, handles, wall, saved measure, furniture/electronics/appliances tabs, Enter/double-click path completion, and Escape cancellation');
+  await clickButton('Fixtures');
+  await clickButton('Toilet');
+  await clickCanvas(canvasX(0.2), y + 550);
+  await waitFor(`document.body.innerText.includes('Selected furniture')`, 'toilet selection');
+  await waitFor(`document.querySelector('select').value === 'toilet'`, 'toilet select value');
+
+  console.log('PASS live DOM selection, handles, wall, saved measure, furniture/fixtures/electronics/appliances tabs, Enter/double-click path completion, and Escape cancellation');
 } finally {
   await command('Browser.close').catch(() => {});
   browser.kill();
