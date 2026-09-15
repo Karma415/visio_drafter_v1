@@ -36,15 +36,15 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   return <aside className="sidebar" aria-label="Drawing tools and properties">
     <h1>Karma's apartment draft</h1>
     <p className="muted">Actual measurements in inches · drawing scale 1:25</p>
-    {error && <div role="alert" className="error">{error}<button onClick={() => useEditorStore.getState().reportError(null)}>Dismiss</button></div>}
+    {error && <div role="alert" className="error">{error}<button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().reportError(null)}>Dismiss</button></div>}
     {warning && <div role="alert" className="error"><p>{warning}</p>
-      <button onClick={() => useDrawingStore.getState().enableRecovery()}>Resume recovery — replace saved copy</button></div>}
+      <button type="button" className="btn-warning" onClick={() => useDrawingStore.getState().enableRecovery()}>Resume recovery — replace saved copy</button></div>}
     {(tools.length > 0 || activeTab === 'view') && <section aria-label="Tools">{tools.length > 0 && <div className="tool-grid">{tools.map((tool) =>
-      <button key={tool.id} aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>{tool.label}</button>,
+      <button key={tool.id} type="button" className="tool-btn" aria-pressed={activeTool === tool.id} onClick={() => useEditorStore.getState().setTool(tool.id)}>{tool.label}</button>,
     )}</div>}
-      <div className="button-row"><button disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>
-        <button disabled={!canRedo} onClick={() => useDrawingStore.getState().redo()}>Redo</button>
-        <button onClick={() => useEditorStore.getState().resetView()}>Reset view</button></div>
+      <div className="button-row"><button type="button" className="btn-secondary" disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>
+        <button type="button" className="btn-secondary" disabled={!canRedo} onClick={() => useDrawingStore.getState().redo()}>Redo</button>
+        <button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().resetView()}>Reset view</button></div>
       <p>Zoom: {Math.round(scale / BASE_PIXELS_PER_MM * 100)}%</p>
       <p className="snap-status" role="status">Snapping: {snapStatus ?? 'Grid and object anchors'}. Hold Alt for free placement.</p>
     </section>}

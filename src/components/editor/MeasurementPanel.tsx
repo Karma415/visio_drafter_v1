@@ -80,7 +80,7 @@ export function MeasurementPanel({ shape, unit }: Props) {
       }}>{FURNITURE_KINDS.map((kind) => <option key={kind} value={kind}>{FURNITURE_DEFINITIONS[kind].label}</option>)}</select></label>}
       <small>{shape.type === 'wall' ? 'Length preserves the wall’s first endpoint and direction. ' : isPath ? 'For paths, width and height scale the existing points. ' : ''}Decimals or fractions work, for example 12 3/8.</small>
       {error && <p role="alert" className="error">{error}</p>}
-      <button type="submit">Apply properties</button>
+      <button type="submit" className="btn-primary">Apply properties</button>
     </form>
     <dl>
       {shape.type === 'wall' ? <><dt>Actual wall length</dt><dd>{formatMetric(getWallLength(shape), unit)}</dd>

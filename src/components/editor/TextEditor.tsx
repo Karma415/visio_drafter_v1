@@ -20,7 +20,7 @@ export function TextEditor({ shape }: { shape: Shape }) {
       <textarea id="shape-text" rows={6} maxLength={MAX_TEXT_LENGTH} value={text}
         onChange={(event) => setText(event.target.value)} />
       <p>Enter adds a new line. Save applies your changes; Escape cancels.</p>
-      <div className="button-row"><button type="button" onClick={close}>Cancel</button><button type="submit">Save</button></div>
+      <div className="button-row"><button type="button" className="btn-secondary" onClick={close}>Cancel</button><button type="submit" className="btn-primary">Save</button></div>
     </form>
   </Modal>;
 }

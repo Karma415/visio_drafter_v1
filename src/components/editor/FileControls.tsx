@@ -15,8 +15,8 @@ export function FileControls() {
   }
   return <section>
     <h2>Drawing file</h2>
-    <div className="button-row"><button onClick={save}>Download drawing</button>
-      <button disabled={reading} onClick={() => input.current?.click()}>{reading ? 'Reading…' : 'Open drawing'}</button></div>
+    <div className="button-row"><button type="button" className="btn-secondary" onClick={save}>Download drawing</button>
+      <button type="button" className="btn-secondary" disabled={reading} onClick={() => input.current?.click()}>{reading ? 'Reading…' : 'Open drawing'}</button></div>
     <input ref={input} type="file" accept=".json,application/json" hidden onChange={async (event) => {
       const file = event.target.files?.[0];
       event.target.value = '';
@@ -29,8 +29,8 @@ export function FileControls() {
     <small>Files stay on your computer. Choose an E: folder in your browser's download settings. Download regularly; browser recovery is not a permanent backup.</small>
     {pending && <Modal title="Open drawing?" onCancel={() => setPending(null)}>
       <p>Open “{pending.name}” ({pending.shapes.length} shapes)? This replaces the current canvas. Download the current drawing first if you want a separate copy.</p>
-      <div className="button-row"><button onClick={save}>Download current</button><button onClick={() => setPending(null)}>Cancel</button>
-        <button onClick={() => {
+      <div className="button-row"><button type="button" className="btn-secondary" onClick={save}>Download current</button><button type="button" className="btn-secondary" onClick={() => setPending(null)}>Cancel</button>
+        <button type="button" className="btn-primary" onClick={() => {
           useDrawingStore.getState().openDocument(pending);
           useEditorStore.getState().resetView();
           setPending(null);
