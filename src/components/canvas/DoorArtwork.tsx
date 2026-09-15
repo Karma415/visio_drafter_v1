@@ -74,10 +74,11 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
     }
   }
 
-  // Door opening rendering
   const isRight = shape.swingHinge === 'right';
   const isOutside = shape.swingDirection === 'outside';
   const doorThickness = Math.min(openingW * 0.05, 38);
+
+  const hitBg = <Rect width={width} height={height} fill="rgba(255,255,255,0.001)" strokeEnabled={false} />;
 
   switch (shape.doorType ?? 'single_door') {
     case 'double_door': {
@@ -88,6 +89,7 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
       const leafY = isOutside ? -leafW : height;
 
       return <>
+        {hitBg}
         <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Line points={[jambW, height * 0.5, width - jambW, height * 0.5]} stroke={arcStroke} strokeWidth={subStrokeWidth} dash={[6 / scale, 4 / scale]} listening={false} />
@@ -107,6 +109,7 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
       const cy = height * 0.5;
       const panelH = Math.min(height * 0.35, 35);
       return <>
+        {hitBg}
         <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Line points={[jambW, cy, width - jambW, cy]} stroke={arcStroke} strokeWidth={subStrokeWidth} listening={false} />
@@ -121,6 +124,7 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
       const panelW = openingW * 0.28;
       const swingY = isOutside ? -panelW * 0.7 : height + panelW * 0.7;
       return <>
+        {hitBg}
         <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Line points={[jambW, height * 0.5, width - jambW, height * 0.5]} stroke={arcStroke} strokeWidth={subStrokeWidth} dash={[6 / scale, 4 / scale]} listening={false} />
@@ -142,6 +146,7 @@ export function DoorArtwork({ shape, selected, scale }: Props) {
       const arcRotation = isRight ? (isOutside ? 180 : 90) : (isOutside ? 270 : 0);
 
       return <>
+        {hitBg}
         <Rect x={0} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Rect x={width - jambW} y={0} width={jambW} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={jambFill} />
         <Line points={[jambW, height * 0.5, width - jambW, height * 0.5]} stroke={arcStroke} strokeWidth={subStrokeWidth} dash={[6 / scale, 4 / scale]} listening={false} />
