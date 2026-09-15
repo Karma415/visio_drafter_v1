@@ -1,5 +1,6 @@
 import type { WallType } from './walls';
 import type { FurnitureKind } from './furniture';
+import type { DoorType, WindowType } from './doors';
 
 /** All geometry is actual millimeters, never screen pixels or paper millimeters. */
 export interface Bounds {
@@ -22,7 +23,9 @@ export type ShapeType =
   | 'text'
   | 'wall'
   | 'measurement'
-  | 'furniture';
+  | 'furniture'
+  | 'door'
+  | 'window';
 
 export interface ShapePoint {
   x: number;
@@ -46,6 +49,11 @@ export interface Shape extends Bounds {
   wallThicknessMm?: number;
   /** Furniture-only semantic identity; dimensions remain ordinary bounds. */
   furnitureKind?: FurnitureKind;
+  /** Door/window opening metadata. */
+  doorType?: DoorType;
+  windowType?: WindowType;
+  swingHinge?: 'left' | 'right';
+  swingDirection?: 'inside' | 'outside';
 }
 
 export interface DrawingDocument {

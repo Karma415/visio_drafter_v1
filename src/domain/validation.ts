@@ -2,6 +2,7 @@ import type { DrawingDocument, Shape, ShapePoint } from './document';
 import { MAX_DISTANCE_MM, MAX_POINTS_PER_SHAPE, MAX_SHAPES, MAX_TEXT_LENGTH, MIN_SIZE_MM } from './document';
 import { isWallType } from './walls';
 import { isFurnitureKind } from './furniture';
+import { isDoorType, isWindowType } from './doors';
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected a drawing object.');
@@ -31,7 +32,7 @@ function points(value: unknown, type: Shape['type']): ShapePoint[] | undefined {
 
 export function validateShape(value: unknown): Shape {
   const item = record(value);
-  if (!['rectangle', 'square', 'circle', 'ellipse', 'triangle', 'line', 'polyline', 'polygon', 'arc', 'text', 'wall', 'measurement', 'furniture'].includes(String(item.type))) throw new Error('Unsupported shape type.');
+  if (!['rectangle', 'square', 'circle', 'ellipse', 'triangle', 'line', 'polyline', 'polygon', 'arc', 'text', 'wall', 'measurement', 'furniture', 'door', 'window'].includes(String(item.type))) throw new Error('Unsupported shape type.');
   const type = item.type as Shape['type'];
   const id = string(item.id, 100);
   if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error('Invalid shape ID.');
@@ -49,6 +50,20 @@ export function validateShape(value: unknown): Shape {
       return { furnitureKind: item.furnitureKind };
     })()
     : {};
+  const door = type === 'door'
+    ? (() => {
+      if (!isDoorType(item.doorType)) throw new Error('Unsupported door type.');
+      const swingHinge = item.swingHinge === 'right' ? 'right' : 'left';
+      const swingDirection = item.swingDirection === 'outside' ? 'outside' : 'inside';
+      return { doorType: item.doorType, swingHinge, swingDirection };
+    })()
+    : {};
+  const windowOpening = type === 'window'
+    ? (() => {
+      if (!isWindowType(item.windowType)) throw new Error('Unsupported window type.');
+      return { windowType: item.windowType };
+    })()
+    : {};
   return {
     id, type, fill,
     x: finite(item.x, -MAX_DISTANCE_MM, MAX_DISTANCE_MM),
@@ -61,6 +76,8 @@ export function validateShape(value: unknown): Shape {
     ...(item.endAngle === undefined ? {} : { endAngle: finite(item.endAngle, -36000, 36000) }),
     ...wall,
     ...furniture,
+    ...door,
+    ...windowOpening,
     ...(points(item.points, type) ? { points: points(item.points, type) } : {}),
   };
 }

@@ -128,7 +128,18 @@ try {
   await waitFor(`document.body.innerText.includes('Selected furniture')`, 'toilet selection');
   await waitFor(`document.querySelector('select').value === 'toilet'`, 'toilet select value');
 
-  console.log('PASS live DOM selection, handles, wall, saved measure, furniture/fixtures/electronics/appliances tabs, Enter/double-click path completion, and Escape cancellation');
+  await clickButton('Walls');
+  await clickButton('Single door');
+  await clickCanvas(canvasX(0.5), y + 600);
+  await waitFor(`document.body.innerText.includes('Selected door')`, 'door selection');
+  await waitFor(`document.body.innerText.includes('Hinge side')`, 'door inspector controls');
+
+  await clickButton('Window');
+  await clickCanvas(canvasX(0.5), y + 700);
+  await waitFor(`document.body.innerText.includes('Selected window')`, 'window selection');
+  await waitFor(`document.body.innerText.includes('Window type')`, 'window inspector controls');
+
+  console.log('PASS live DOM selection, handles, wall, doors, windows, saved measure, furniture/fixtures/electronics/appliances tabs, Enter/double-click path completion, and Escape cancellation');
 } finally {
   await command('Browser.close').catch(() => {});
   browser.kill();

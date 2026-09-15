@@ -31,6 +31,7 @@ const { loadRecovery, saveRecovery } = await import('../src/services/recovery.ts
 const { useDrawingStore } = await import('../src/store/useDrawingStore.ts');
 const { WALL_DEFINITIONS, WALL_TYPES } = await import('../src/domain/walls.ts');
 const { FURNITURE_DEFINITIONS, FURNITURE_KINDS } = await import('../src/domain/furniture.ts');
+const { DOOR_TYPES, WINDOW_TYPES, OPENING_DEFINITIONS } = await import('../src/domain/doors.ts');
 
 const shape = { id: 'test-shape', type: 'rectangle', x: -25.4, y: 50.8, width: 3048, height: 304.8, fill: '#3b82f6' };
 const drawing = () => ({ ...createDocument(), shapes: [{ ...shape }] });
@@ -347,6 +348,30 @@ test('furniture uses approved kinds and keeps real-world editable dimensions thr
     assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [furniture] })).shapes[0], furniture);
   }
   assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...shape, type: 'furniture', furnitureKind: 'unknown' }] })));
+});
+
+test('doors and windows validate and survive drawing export/import with swing and opening properties', () => {
+  assert.equal(DOOR_TYPES.length, 4);
+  assert.equal(WINDOW_TYPES.length, 3);
+  for (const doorType of DOOR_TYPES) {
+    const def = OPENING_DEFINITIONS[doorType];
+    const door = {
+      ...shape, id: `test-${doorType}`, type: 'door', doorType,
+      width: def.defaultWidthMm, height: def.defaultThicknessMm, fill: def.color,
+      swingHinge: 'right', swingDirection: 'outside',
+    };
+    assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [door] })).shapes[0], door);
+  }
+  for (const windowType of WINDOW_TYPES) {
+    const def = OPENING_DEFINITIONS[windowType];
+    const windowOpening = {
+      ...shape, id: `test-${windowType}`, type: 'window', windowType,
+      width: def.defaultWidthMm, height: def.defaultThicknessMm, fill: def.color,
+    };
+    assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [windowOpening] })).shapes[0], windowOpening);
+  }
+  assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...shape, type: 'door', doorType: 'invalid_door' }] })));
+  assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [{ ...shape, type: 'window', windowType: 'invalid_window' }] })));
 });
 
 test('alignment guides detect edge and center alignments between dragged shape and targets', () => {

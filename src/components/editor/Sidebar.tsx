@@ -7,6 +7,7 @@ import { FileControls } from './FileControls';
 import type { CommandTab } from './navigation';
 import type { FurnitureCategory } from '../../domain/furniture';
 import { FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
+import { DOOR_TYPES, OPENING_DEFINITIONS, WINDOW_TYPES } from '../../domain/doors';
 import { ToolIcon } from './ToolIcons';
 
 const TOOLS: { id: ActiveTool; label: string }[] = [
@@ -16,13 +17,15 @@ const TOOLS: { id: ActiveTool; label: string }[] = [
   { id: 'triangle', label: 'Triangle' }, { id: 'arc', label: 'Arc' },
   { id: 'wall', label: 'Wall' },
   { id: 'furniture', label: 'Furniture' },
+  { id: 'door', label: 'Door' },
+  { id: 'window', label: 'Window' },
   { id: 'measure', label: 'Measure' },
   { id: 'text', label: 'Text' },
 ];
 const TAB_TOOLS: Record<CommandTab, ActiveTool[]> = {
   file: [],
   draw: ['select', 'line', 'polyline', 'polygon', 'rectangle', 'circle', 'triangle', 'arc'],
-  walls: ['wall'],
+  walls: ['wall', 'door', 'window'],
   annotate: ['measure', 'text'],
   furniture: ['furniture'],
   view: [],
@@ -37,6 +40,8 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   const error = useEditorStore((state) => state.error);
   const snapStatus = useEditorStore((state) => state.snapStatus);
   const placedFurnitureKind = useEditorStore((state) => state.placedFurnitureKind);
+  const placedDoorType = useEditorStore((state) => state.placedDoorType);
+  const placedWindowType = useEditorStore((state) => state.placedWindowType);
   const [furnitureCategory, setFurnitureCategory] = useState<FurnitureCategory>('furniture');
 
   const tools = TOOLS.filter((tool) => TAB_TOOLS[activeTab].includes(tool.id));
@@ -50,7 +55,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
     {error && <div role="alert" className="error">{error}<button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().reportError(null)}>Dismiss</button></div>}
     {warning && <div role="alert" className="error"><p>{warning}</p>
       <button type="button" className="btn-warning" onClick={() => useDrawingStore.getState().enableRecovery()}>Resume recovery — replace saved copy</button></div>}
-    {(tools.length > 0 || activeTab === 'view' || activeTab === 'furniture') && <section aria-label="Tools">
+    {(tools.length > 0 || activeTab === 'view' || activeTab === 'furniture' || activeTab === 'walls') && <section aria-label="Tools">
       {activeTab === 'furniture' ? (
         <>
           <div className="sub-category-tabs" role="tablist" aria-label="Furniture category">
@@ -83,6 +88,50 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
                 </button>
               );
             })}
+          </div>
+        </>
+      ) : activeTab === 'walls' ? (
+        <>
+          <div className="tool-grid">
+            <button
+              type="button"
+              className="tool-btn"
+              aria-pressed={activeTool === 'wall'}
+              onClick={() => useEditorStore.getState().setTool('wall')}
+            >
+              <ToolIcon tool="wall" />
+              <span>Wall</span>
+            </button>
+          </div>
+          <h2>Doors & Openings</h2>
+          <div className="tool-grid">
+            {DOOR_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                className="tool-btn"
+                aria-pressed={activeTool === 'door' && placedDoorType === type}
+                onClick={() => useEditorStore.getState().setPlacedDoorType(type)}
+              >
+                <ToolIcon tool="door" />
+                <span>{OPENING_DEFINITIONS[type].label}</span>
+              </button>
+            ))}
+          </div>
+          <h2>Windows</h2>
+          <div className="tool-grid">
+            {WINDOW_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                className="tool-btn"
+                aria-pressed={activeTool === 'window' && placedWindowType === type}
+                onClick={() => useEditorStore.getState().setPlacedWindowType(type)}
+              >
+                <ToolIcon tool="window" />
+                <span>{OPENING_DEFINITIONS[type].label}</span>
+              </button>
+            ))}
           </div>
         </>
       ) : tools.length > 0 ? (

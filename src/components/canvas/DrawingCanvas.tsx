@@ -6,6 +6,7 @@ import { isCenteredShape, isProportionalShape, nodePosition, normalizePoints, sc
 import type { ShapePoint } from '../../domain/document';
 import { WALL_DEFINITIONS } from '../../domain/walls';
 import { FURNITURE_DEFINITIONS } from '../../domain/furniture';
+import { OPENING_DEFINITIONS } from '../../domain/doors';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { BASE_PIXELS_PER_MM, useEditorStore } from '../../store/useEditorStore';
 import { DrawingGrid } from './DrawingGrid';
@@ -206,12 +207,30 @@ export function DrawingCanvas() {
     try {
       const placedKind = editor.placedFurnitureKind;
       const furniture = activeTool === 'furniture' ? FURNITURE_DEFINITIONS[placedKind] : null;
+      const doorDef = activeTool === 'door' ? OPENING_DEFINITIONS[editor.placedDoorType] : null;
+      const windowDef = activeTool === 'window' ? OPENING_DEFINITIONS[editor.placedWindowType] : null;
+
+      const width = furniture?.defaultWidthMm
+        ?? doorDef?.defaultWidthMm
+        ?? windowDef?.defaultWidthMm
+        ?? (activeTool === 'text' ? 1219.2 : 609.6);
+
+      const height = furniture?.defaultHeightMm
+        ?? doorDef?.defaultThicknessMm
+        ?? windowDef?.defaultThicknessMm
+        ?? (activeTool === 'text' ? 254 : 609.6);
+
+      const fill = furniture?.color
+        ?? doorDef?.color
+        ?? windowDef?.color
+        ?? (activeTool === 'text' ? '#111827' : activeTool === 'arc' ? '#1d4ed8' : activeTool === 'circle' || activeTool === 'ellipse' ? '#8b5cf6' : '#3b82f6');
+
       useDrawingStore.getState().addShape({
         type: activeTool, x: point.x, y: point.y,
-        width: furniture?.defaultWidthMm ?? (activeTool === 'text' ? 1219.2 : 609.6),
-        height: furniture?.defaultHeightMm ?? (activeTool === 'text' ? 254 : 609.6),
-        fill: furniture?.color ?? (activeTool === 'text' ? '#111827' : activeTool === 'arc' ? '#1d4ed8' : activeTool === 'circle' || activeTool === 'ellipse' ? '#8b5cf6' : '#3b82f6'),
+        width, height, fill,
         ...(furniture ? { furnitureKind: placedKind } : {}),
+        ...(doorDef ? { doorType: editor.placedDoorType, swingHinge: 'left', swingDirection: 'inside' } : {}),
+        ...(windowDef ? { windowType: editor.placedWindowType } : {}),
         ...(activeTool === 'text' ? { text: 'Select and click Edit Text' } : {}),
         ...(activeTool === 'arc' ? { startAngle: 0, endAngle: 180 } : {}),
       });

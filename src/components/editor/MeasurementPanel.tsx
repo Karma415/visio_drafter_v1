@@ -6,6 +6,8 @@ import { WALL_DEFINITIONS, WALL_TYPES } from '../../domain/walls';
 import { useEditorStore } from '../../store/useEditorStore';
 import { wallLength as getWallLength } from '../../domain/geometry';
 import { DEFAULT_FURNITURE_KIND, FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
+import type { DoorType, WindowType } from '../../domain/doors';
+import { DEFAULT_DOOR_TYPE, DEFAULT_WINDOW_TYPE, DOOR_TYPES, OPENING_DEFINITIONS, WINDOW_TYPES } from '../../domain/doors';
 
 interface Props { shape: Shape; unit: 'mm' | 'cm' }
 export function MeasurementPanel({ shape, unit }: Props) {
@@ -20,6 +22,10 @@ export function MeasurementPanel({ shape, unit }: Props) {
   const [wallThickness, setWallThickness] = useState(String(Number(mmToInches(shape.wallThicknessMm ?? 101.6).toFixed(8))));
   const [wallLength, setWallLength] = useState(String(Number(mmToInches(getWallLength(shape)).toFixed(8))));
   const [furnitureKind, setFurnitureKind] = useState(shape.furnitureKind ?? DEFAULT_FURNITURE_KIND);
+  const [doorType, setDoorType] = useState<DoorType>(shape.doorType ?? DEFAULT_DOOR_TYPE);
+  const [windowType, setWindowType] = useState<WindowType>(shape.windowType ?? DEFAULT_WINDOW_TYPE);
+  const [swingHinge, setSwingHinge] = useState<'left' | 'right'>(shape.swingHinge ?? 'left');
+  const [swingDirection, setSwingDirection] = useState<'inside' | 'outside'>(shape.swingDirection ?? 'inside');
   const [error, setError] = useState('');
   const isPath = shape.type === 'line' || shape.type === 'polyline' || shape.type === 'polygon' || shape.type === 'wall' || shape.type === 'measurement';
   return <section aria-labelledby="selection-title">
@@ -43,10 +49,30 @@ export function MeasurementPanel({ shape, unit }: Props) {
         };
         const numericRotation = Number(rotation);
         if (!Number.isFinite(numericRotation)) throw new Error('Rotation must be a number of degrees.');
-        const properties: { fill?: string; rotation: number; startAngle?: number; endAngle?: number; wallType?: typeof wallType; wallThicknessMm?: number; furnitureKind?: typeof furnitureKind } = { rotation: numericRotation };
+        const properties: {
+          fill?: string;
+          rotation: number;
+          startAngle?: number;
+          endAngle?: number;
+          wallType?: typeof wallType;
+          wallThicknessMm?: number;
+          furnitureKind?: typeof furnitureKind;
+          doorType?: DoorType;
+          windowType?: WindowType;
+          swingHinge?: 'left' | 'right';
+          swingDirection?: 'inside' | 'outside';
+        } = { rotation: numericRotation };
         if (shape.type === 'furniture') {
           properties.furnitureKind = furnitureKind;
           properties.fill = FURNITURE_DEFINITIONS[furnitureKind].color;
+        }
+        if (shape.type === 'door') {
+          properties.doorType = doorType;
+          properties.swingHinge = swingHinge;
+          properties.swingDirection = swingDirection;
+        }
+        if (shape.type === 'window') {
+          properties.windowType = windowType;
         }
         if (shape.type === 'arc') {
           const start = Number(startAngle);
@@ -63,8 +89,8 @@ export function MeasurementPanel({ shape, unit }: Props) {
     }}>
       {shape.type !== 'wall' && <><label>X position — actual inches<input value={x} onChange={(event) => setX(event.target.value)} /></label>
         <label>Y position — actual inches<input value={y} onChange={(event) => setY(event.target.value)} /></label>
-        <label>Width — actual inches<input value={width} onChange={(event) => setWidth(event.target.value)} /></label>
-        <label>Height — actual inches<input value={height} onChange={(event) => setHeight(event.target.value)} /></label></>}
+        <label>{shape.type === 'door' || shape.type === 'window' ? 'Opening width — actual inches' : 'Width — actual inches'}<input value={width} onChange={(event) => setWidth(event.target.value)} /></label>
+        <label>{shape.type === 'door' || shape.type === 'window' ? 'Wall / jamb thickness — actual inches' : 'Height — actual inches'}<input value={height} onChange={(event) => setHeight(event.target.value)} /></label></>}
       {shape.type !== 'measurement' && <label>Rotation — degrees<input inputMode="decimal" value={rotation} onChange={(event) => setRotation(event.target.value)} /></label>}
       {shape.type === 'arc' && <><label>Arc start — degrees<input inputMode="decimal" value={startAngle} onChange={(event) => setStartAngle(event.target.value)} /></label>
         <label>Arc end — degrees<input inputMode="decimal" value={endAngle} onChange={(event) => setEndAngle(event.target.value)} /></label></>}
@@ -84,6 +110,38 @@ export function MeasurementPanel({ shape, unit }: Props) {
               <option key={kind} value={kind}>{FURNITURE_DEFINITIONS[kind].label}</option>
             ))}
           </optgroup>
+        ))}
+      </select></label>}
+      {shape.type === 'door' && <>
+        <label>Door type<select value={doorType} onChange={(event) => {
+          const next = event.target.value as DoorType;
+          const def = OPENING_DEFINITIONS[next];
+          setDoorType(next);
+          setWidth(String(Number(mmToInches(def.defaultWidthMm).toFixed(8))));
+          setHeight(String(Number(mmToInches(def.defaultThicknessMm).toFixed(8))));
+        }}>
+          {DOOR_TYPES.map((type) => (
+            <option key={type} value={type}>{OPENING_DEFINITIONS[type].label}</option>
+          ))}
+        </select></label>
+        <label>Hinge side<select value={swingHinge} onChange={(event) => setSwingHinge(event.target.value as 'left' | 'right')}>
+          <option value="left">Left hinge</option>
+          <option value="right">Right hinge</option>
+        </select></label>
+        <label>Swing direction<select value={swingDirection} onChange={(event) => setSwingDirection(event.target.value as 'inside' | 'outside')}>
+          <option value="inside">Inward swing</option>
+          <option value="outside">Outward swing</option>
+        </select></label>
+      </>}
+      {shape.type === 'window' && <label>Window type<select value={windowType} onChange={(event) => {
+        const next = event.target.value as WindowType;
+        const def = OPENING_DEFINITIONS[next];
+        setWindowType(next);
+        setWidth(String(Number(mmToInches(def.defaultWidthMm).toFixed(8))));
+        setHeight(String(Number(mmToInches(def.defaultThicknessMm).toFixed(8))));
+      }}>
+        {WINDOW_TYPES.map((type) => (
+          <option key={type} value={type}>{OPENING_DEFINITIONS[type].label}</option>
         ))}
       </select></label>}
       <small>{shape.type === 'wall' ? 'Length preserves the wall’s first endpoint and direction. ' : isPath ? 'For paths, width and height scale the existing points. ' : ''}Decimals or fractions work, for example 12 3/8.</small>

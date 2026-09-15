@@ -9,6 +9,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { WALL_DEFINITIONS } from '../../domain/walls';
 import { formatMetric, formatNumber, mmToInches } from '../../domain/units';
 import { FurnitureArtwork } from './FurnitureArtwork';
+import { DoorArtwork } from './DoorArtwork';
 
 export type ShapeNode = Konva.Node;
 interface Props {
@@ -146,6 +147,11 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
   if (shape.type === 'furniture') {
     return <Group {...nodeProps} width={shape.width} height={shape.height}>
       <FurnitureArtwork shape={shape} selected={selected} scale={scale} />
+    </Group>;
+  }
+  if (shape.type === 'door' || shape.type === 'window') {
+    return <Group {...nodeProps} width={shape.width} height={shape.height}>
+      <DoorArtwork shape={shape} selected={selected} scale={scale} />
     </Group>;
   }
   if (shape.type === 'text') {

@@ -99,6 +99,24 @@ export function ToolIcon({ tool, size = 18, className = 'tool-icon', ...rest }: 
           <line x1="9" y1="20" x2="15" y2="20" />
         </svg>
       );
+    case 'door':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>
+          <rect x="3" y="19" width="3" height="3" fill="currentColor" />
+          <rect x="18" y="19" width="3" height="3" fill="currentColor" />
+          <line x1="6" y1="20.5" x2="6" y2="7" strokeWidth="2.5" />
+          <path d="M6 7 A 13.5 13.5 0 0 1 19.5 20.5" strokeDasharray="3 2" />
+        </svg>
+      );
+    case 'window':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>
+          <rect x="3" y="5" width="18" height="14" rx="1" />
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="1" y1="21" x2="23" y2="21" strokeWidth="2.5" />
+        </svg>
+      );
     default:
       return null;
   }
