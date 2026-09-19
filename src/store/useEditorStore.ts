@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AlignmentGuide, Point } from '../domain/geometry';
-import type { ShapeType } from '../domain/document';
+import type { Shape, ShapeType } from '../domain/document';
 import type { WallType } from '../domain/walls';
 import { DEFAULT_WALL_TYPE, WALL_DEFINITIONS } from '../domain/walls';
 import type { FurnitureKind } from '../domain/furniture';
@@ -22,6 +22,10 @@ interface EditorState {
   snapStatus: SnapStatus;
   wallDefaults: WallDefaults;
   alignmentGuides: AlignmentGuide[];
+  showProximityGuides: boolean;
+  proximityShape: Shape | null;
+  toggleProximityGuides: () => void;
+  setProximityShape: (shape: Shape | null) => void;
   placedFurnitureKind: FurnitureKind;
   placedDoorType: DoorType;
   placedWindowType: WindowType;
@@ -45,17 +49,21 @@ export const useEditorStore = create<EditorState>((set) => ({
   scale: BASE_PIXELS_PER_MM, position: { x: 40, y: 40 }, error: null, snapStatus: null,
   wallDefaults: { wallType: DEFAULT_WALL_TYPE, wallThicknessMm: WALL_DEFINITIONS[DEFAULT_WALL_TYPE].defaultThicknessMm },
   alignmentGuides: [],
+  showProximityGuides: true,
+  proximityShape: null,
+  toggleProximityGuides: () => set(state => ({ showProximityGuides: !state.showProximityGuides })),
+  setProximityShape: (proximityShape) => set({ proximityShape }),
   placedFurnitureKind: DEFAULT_FURNITURE_KIND,
   placedDoorType: DEFAULT_DOOR_TYPE,
   placedWindowType: DEFAULT_WINDOW_TYPE,
-  setTool: (activeTool) => set({ activeTool, alignmentGuides: [], selectedIds: [] }),
+  setTool: (activeTool) => set({ activeTool, alignmentGuides: [], proximityShape: null, selectedIds: [] }),
   select: (id, multi) => set((state) => {
-    if (!id) return { selectedIds: [], alignmentGuides: [] };
+    if (!id) return { selectedIds: [], alignmentGuides: [], proximityShape: null };
     if (multi) {
       const selectedIds = state.selectedIds.includes(id) ? state.selectedIds.filter(s => s !== id) : [...state.selectedIds, id];
-      return { selectedIds, alignmentGuides: [] };
+      return { selectedIds, alignmentGuides: [], proximityShape: null };
     }
-    return { selectedIds: [id], alignmentGuides: [] };
+    return { selectedIds: [id], alignmentGuides: [], proximityShape: null };
   }),
   editText: (editingId) => set({ editingId }),
   setViewport: (position, scale) => set({ position, scale }),
@@ -66,7 +74,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setPlacedFurnitureKind: (placedFurnitureKind) => set({ placedFurnitureKind, activeTool: 'furniture' }),
   setPlacedDoorType: (placedDoorType) => set({ placedDoorType, activeTool: 'door' }),
   setPlacedWindowType: (placedWindowType) => set({ placedWindowType, activeTool: 'window' }),
-  resetView: () => set({ activeTool: 'select', selectedIds: [], editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [] }),
+  resetView: () => set({ activeTool: 'select', selectedIds: [], editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [], proximityShape: null }),
   displayUnit: 'inches',
   setDisplayUnit: (displayUnit) => set({ displayUnit }),
 }));

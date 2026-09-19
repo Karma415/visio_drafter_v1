@@ -10,7 +10,10 @@ export function useEditorKeyboard() {
         (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select')))) return;
       const drawing = useDrawingStore.getState();
       const editor = useEditorStore.getState();
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      if (event.key.toLowerCase() === 'd' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat) {
+        event.preventDefault();
+        editor.toggleProximityGuides();
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) drawing.redo(); else drawing.undo();
       } else if (editor.selectedIds.length > 0 && (event.key === 'Delete' || event.key === 'Backspace')) {

@@ -46,6 +46,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
   function dragEnd(event: KonvaEventObject<DragEvent>) {
     event.cancelBubble = true;
     useEditorStore.getState().setAlignmentGuides([]);
+    useEditorStore.getState().setProximityShape(null);
     const node = event.target;
     const offset = isCenteredShape(shape) ? { x: shape.width / 2, y: shape.height / 2 } : { x: 0, y: 0 };
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
@@ -85,6 +86,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     if (event.evt.altKey) {
       useEditorStore.getState().setSnapStatus('Free placement (Alt)');
       useEditorStore.getState().setAlignmentGuides([]);
+      useEditorStore.getState().setProximityShape({ ...shape, ...raw, rotation: node.rotation() });
       return;
     }
     const editorScale = useEditorStore.getState().scale;
@@ -99,6 +101,10 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     if ('rotation' in snapResult && typeof snapResult.rotation === 'number') {
       node.rotation(snapResult.rotation);
     }
+    useEditorStore.getState().setProximityShape({
+      ...shape, ...snapResult.point, rotation: node.rotation(),
+      height: 'height' in snapResult && typeof snapResult.height === 'number' ? snapResult.height : shape.height,
+    });
     useEditorStore.getState().setSnapStatus(snapResult.kind === 'wall' ? 'Wall join snap' : snapResult.kind === 'object' ? 'Object snap' : 'Grid snap');
     if (shape.type !== 'wall' && !isOpening) {
       const guides = findAlignmentGuides(snapResult.point, shape, shapes, 0.5);

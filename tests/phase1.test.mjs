@@ -26,6 +26,9 @@ Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable
 const { createDocument } = await import('../src/domain/document.ts');
 const { inchesToMm, mmToInches, paperMm, parseInches } = await import('../src/domain/units.ts');
 const { distanceBetween, findAlignmentGuides, resizeWallToLength, snap, screenToWorld, snapOpeningOrigin, snapShapeOrigin, snapToDrawingPoint, snapToWallFace, snapToWallPoint, snapWallEndpoint, snapWallOrigin, visibleGridStep, nodePosition, normalizePoints, resizePoints, snappedBounds, wallLength } = await import('../src/domain/geometry.ts');
+const { getBoundarySnapPoint, nearestWallFace } = await import('../src/domain/geometry.ts');
+const { calculateProximityGuides, proximityBounds } = await import('../src/domain/geometry.ts');
+const { useEditorStore } = await import('../src/store/useEditorStore.ts');
 const { decodeDrawing, encodeDrawing } = await import('../src/services/drawingFiles.ts');
 const { loadRecovery, saveRecovery } = await import('../src/services/recovery.ts');
 const { useDrawingStore } = await import('../src/store/useDrawingStore.ts');
@@ -36,6 +39,66 @@ const { DOOR_TYPES, WINDOW_TYPES, OPENING_DEFINITIONS } = await import('../src/d
 const shape = { id: 'test-shape', type: 'rectangle', x: -25.4, y: 50.8, width: 3048, height: 304.8, fill: '#3b82f6' };
 const drawing = () => ({ ...createDocument(), shapes: [{ ...shape }] });
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+
+test('Proximity guides select the nearest adjacent edge in each direction', () => {
+  const dragged = { ...shape, id: 'dragged', x: 100, y: 100, width: 100, height: 100 };
+  const targets = [
+    dragged,
+    { ...dragged, id: 'top', y: -50 },
+    { ...dragged, id: 'bottom', y: 230 },
+    { ...dragged, id: 'left', x: -20 },
+    { ...dragged, id: 'right-far', x: 400 },
+    { ...dragged, id: 'right', x: 250 },
+    { ...dragged, id: 'diagonal', x: 210, y: 210 },
+    { ...dragged, id: 'overlap', x: 110, y: 110 },
+    { ...dragged, id: 'annotation', type: 'measurement', x: 201 },
+  ];
+  const guides = calculateProximityGuides(dragged, targets, dragged.id);
+  assert.deepEqual(guides.map(g => [g.direction, g.distanceMm, g.targetId]), [
+    ['top', 50, 'top'], ['bottom', 30, 'bottom'], ['left', 20, 'left'], ['right', 50, 'right'],
+  ]);
+  for (const guide of guides) close(distanceBetween(guide.start, guide.end), guide.distanceMm);
+  assert.deepEqual(calculateProximityGuides(dragged, []), []);
+});
+
+test('Proximity guides measure wall faces including later segments and diagonal strokes', () => {
+  const bounds = { x: 100, y: 100, width: 100, height: 100 };
+  const wall = { ...shape, id: 'wall', type: 'wall', x: 0, y: 0, width: 400, height: 400,
+    points: [0, 0, 400, 0, 400, 400], wallThicknessMm: 40 };
+  const guides = calculateProximityGuides(bounds, [wall]);
+  assert.deepEqual(guides.map(g => [g.direction, g.distanceMm]), [['top', 80], ['right', 180]]);
+  const diagonal = { ...wall, x: 300, points: [0, 0, 400, 400], wallThicknessMm: 20 };
+  const right = calculateProximityGuides(bounds, [diagonal]).find(g => g.direction === 'right');
+  assert.ok(right);
+  close(right.distanceMm, 200 - 10 * Math.SQRT2);
+  close(right.end.y, 100);
+  const touching = { ...shape, id: 'touching', x: 200, y: 100, width: 100, height: 100 };
+  assert.equal(calculateProximityGuides(bounds, [touching])[0].distanceMm, 0);
+});
+
+test('Proximity bounds rotate around the same origins as canvas shapes', () => {
+  const bounds = proximityBounds({ ...shape, x: 100, y: 200, width: 100, height: 50, rotation: 90 });
+  close(bounds.x, 50); close(bounds.y, 200); close(bounds.width, 50); close(bounds.height, 100);
+  const wall = proximityBounds({ ...shape, type: 'wall', x: 0, y: 0, points: [0, 0, 400, 0], wallThicknessMm: 40 });
+  assert.deepEqual(wall, { x: 0, y: -20, width: 400, height: 40 });
+});
+
+test('Proximity visibility toggles immediately and transient drag state clears on reset', () => {
+  const initial = useEditorStore.getState();
+  try {
+    assert.equal(initial.showProximityGuides, true);
+    initial.setProximityShape(shape);
+    initial.toggleProximityGuides();
+    assert.equal(useEditorStore.getState().showProximityGuides, false);
+    assert.equal(useEditorStore.getState().proximityShape, shape);
+    initial.toggleProximityGuides();
+    assert.equal(useEditorStore.getState().showProximityGuides, true);
+    initial.resetView();
+    assert.equal(useEditorStore.getState().proximityShape, null);
+  } finally {
+    useEditorStore.setState(initial);
+  }
+});
 
 beforeEach(() => {
   storage.clear();
@@ -257,7 +320,7 @@ test('Phase 3 wall categories have explicit, non-persistent visual shorthand', (
   assert.ok(WALL_TYPES.every((type) => WALL_DEFINITIONS[type].color.startsWith('#')));
 });
 
-test('Phase 3 wall joins snap endpoints to a wall centerline without using an infinite extension', () => {
+test('Phase 3 wall joins snap to a finite wall face without using centerline anchors', () => {
   const target = {
     ...shape,
     id: 'target-wall',
@@ -266,11 +329,12 @@ test('Phase 3 wall joins snap endpoints to a wall centerline without using an in
     y: 100,
     width: 400,
     height: 1,
-    points: [{ x: 0, y: 0 }, { x: 400, y: 0 }],
+    points: [0, 0, 400, 0],
     wallType: 'interior_partition',
     wallThicknessMm: 101.6,
   };
-  assert.deepEqual(snapToWallPoint({ x: 280, y: 108 }, [target], 25, 12), { point: { x: 280, y: 100 }, kind: 'wall' });
+  assert.deepEqual(snapToWallPoint({ x: 280, y: 155 }, [target], 25, 12), { point: { x: 280, y: 150.8 }, kind: 'wall' });
+  assert.equal(snapToWallPoint({ x: 300, y: 100 }, [target], 25, 12).kind, 'grid');
   assert.deepEqual(snapToWallPoint({ x: 550, y: 108 }, [target], 25, 12), { point: { x: 550, y: 100 }, kind: 'grid' });
 });
 
@@ -283,13 +347,29 @@ test('Phase 3 wall endpoints stop at the nearest visible face of a thick wall', 
     y: 100,
     width: 400,
     height: 1,
-    points: [{ x: 0, y: 0 }, { x: 400, y: 0 }],
+    points: [0, 0, 400, 0],
     wallType: 'interior_partition',
     wallThicknessMm: 100,
   };
   assert.deepEqual(snapWallEndpoint({ x: 280, y: 55 }, { x: 280, y: 0 }, [target], 25, 12), { point: { x: 280, y: 50 }, kind: 'wall' });
-  const moving = { ...target, id: 'moving-wall', x: 280, y: -45, points: [{ x: 0, y: 0 }, { x: 0, y: 100 }] };
+  assert.deepEqual(snapWallEndpoint({ x: 280, y: 145 }, { x: 280, y: 250 }, [target], 25, 12), { point: { x: 280, y: 150 }, kind: 'wall' });
+  const moving = { ...target, id: 'moving-wall', wallType: 'exterior_masonry', wallThicknessMm: 25, x: 280, y: -45, points: [0, 0, 0, 100] };
   assert.deepEqual(snapWallOrigin({ x: 280, y: -45 }, moving, [target], 25, 12), { point: { x: 280, y: -50 }, kind: 'wall' });
+  assert.equal(snapWallEndpoint({ x: 280, y: 55 }, { x: 280, y: 0 }, [target], 25, 12, target.id).kind, 'grid');
+  const vertical = { ...target, width: 1, height: 400, points: [0, 0, 0, 400] };
+  assert.deepEqual(snapWallEndpoint({ x: 55, y: 280 }, { x: 0, y: 280 }, [vertical], 25, 12), { point: { x: 50, y: 280 }, kind: 'wall' });
+  assert.deepEqual(snapWallEndpoint({ x: 145, y: 280 }, { x: 250, y: 280 }, [vertical], 25, 12), { point: { x: 150, y: 280 }, kind: 'wall' });
+});
+
+test('Boundary helpers offset by half the target thickness at ends and on diagonal walls', () => {
+  for (const boundary of [getBoundarySnapPoint, nearestWallFace]) {
+    assert.deepEqual(boundary({ x: 0, y: 0 }, { x: -1, y: -100 }, { x: 0, y: 0 }, { x: 100, y: 0 }, 20), { x: 0, y: -10 });
+    assert.deepEqual(boundary({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 100, y: 0 }, 20), { x: 0, y: 10 });
+    assert.deepEqual(boundary({ x: 5, y: 5 }, { x: 0, y: 100 }, { x: 5, y: 5 }, { x: 5, y: 5 }, 20), { x: 5, y: 5 });
+    const face = boundary({ x: 50, y: 50 }, { x: 0, y: 100 }, { x: 0, y: 0 }, { x: 100, y: 100 }, 20);
+    close(face.x, 50 - 10 / Math.SQRT2);
+    close(face.y, 50 + 10 / Math.SQRT2);
+  }
 });
 
 test('Phase 3 exact wall length preserves the first endpoint, including after rotation', () => {
@@ -402,7 +482,7 @@ test('snapOpeningOrigin snaps doors and windows to walls with matching angle, th
     y: 2000,
     width: 4000,
     height: 1,
-    points: [{ x: 0, y: 0 }, { x: 4000, y: 0 }],
+    points: [0, 0, 4000, 0],
     wallType: 'interior_partition',
     wallThicknessMm: 150,
   };
@@ -438,7 +518,7 @@ test('snapOpeningOrigin snaps doors and windows to walls with matching angle, th
     y: 1000,
     width: 1,
     height: 4000,
-    points: [{ x: 0, y: 0 }, { x: 0, y: 4000 }],
+    points: [0, 0, 0, 4000],
     wallType: 'exterior_brick',
     wallThicknessMm: 200,
   };
@@ -455,3 +535,40 @@ test('snapOpeningOrigin snaps doors and windows to walls with matching angle, th
   assert.equal(farResult.kind, 'grid');
 });
 
+test('Doors and windows embed on every wall segment in either direction', () => {
+  const wall = { ...shape, id: 'segmented-wall', type: 'wall', x: 0, y: 0, width: 4000, height: 4000,
+    points: [0, 0, 4000, 0, 4000, 4000], wallThicknessMm: 200 };
+  for (const type of ['door', 'window']) {
+    for (const rotation of [0, 180]) {
+      const opening = { ...shape, id: 'opening', type, width: 900, height: 100, rotation };
+      const result = snapOpeningOrigin({ x: 3990, y: 2000 }, opening, [wall], 25, 20);
+      assert.equal(result.kind, 'wall');
+      assert.equal(result.height, 200);
+      const radians = result.rotation * Math.PI / 180;
+      close(result.point.x + 450 * Math.cos(radians) - 100 * Math.sin(radians), 4000);
+      const placed = { ...opening, ...result.point, height: result.height, rotation: result.rotation };
+      const again = snapOpeningOrigin(result.point, placed, [wall], 25, 20);
+      close(again.point.x, result.point.x);
+      close(again.point.y, result.point.y);
+    }
+  }
+});
+
+test('Opening centers remain on rotated wall centerlines including reversed openings', () => {
+  for (const wallRotation of [0, 2, 45, 90]) {
+    const radians = wallRotation * Math.PI / 180;
+    const wall = { ...shape, id: 'rotated-wall', type: 'wall', x: 100, y: 200, width: 4000, height: 1,
+      points: [0, 0, 4000, 0], rotation: wallRotation, wallThicknessMm: 150 };
+    for (const reverse of [0, 180]) {
+      const opening = { ...shape, id: 'opening', type: 'window', width: 900, height: 100, rotation: wallRotation + reverse };
+      const origin = { x: 100 + 2000 * Math.cos(radians), y: 200 + 2000 * Math.sin(radians) };
+      const result = snapOpeningOrigin(origin, opening, [wall], 25, 20);
+      assert.equal(result.kind, 'wall');
+      const angle = result.rotation * Math.PI / 180;
+      const cx = result.point.x + 450 * Math.cos(angle) - 75 * Math.sin(angle);
+      const cy = result.point.y + 450 * Math.sin(angle) + 75 * Math.cos(angle);
+      close(-(cx - wall.x) * Math.sin(radians) + (cy - wall.y) * Math.cos(radians), 0);
+      close(Math.sin(angle - radians), 0);
+    }
+  }
+});

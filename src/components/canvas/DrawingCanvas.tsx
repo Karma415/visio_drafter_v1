@@ -14,6 +14,7 @@ import { ShapeView } from './ShapeView';
 import type { ShapeNode } from './ShapeView';
 import { MeasurementOverlay } from './MeasurementOverlay';
 import { AlignmentGuides } from './AlignmentGuides';
+import { ProximityGuides } from './ProximityGuides';
 import { registerStage } from '../../services/projectFiles';
 
 function shapeLayerOrder(shape: Shape): number {
@@ -531,6 +532,7 @@ export function DrawingCanvas() {
           />
         )}
         <AlignmentGuides guides={alignmentGuides} scale={scale} viewport={{ position, size }} />
+        <ProximityGuides />
         <Transformer ref={transformerRef} rotateEnabled={selectedShape?.type !== 'measurement'} flipEnabled={false}
           keepRatio={Boolean(selectedShape && isProportionalShape(selectedShape))}
           ignoreStroke={true} padding={selectedShape?.type === 'measurement' ? 0 : undefined} borderStroke="#1d4ed8" borderStrokeWidth={2}
