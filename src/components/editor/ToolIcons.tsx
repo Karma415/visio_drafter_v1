@@ -49,6 +49,8 @@ export function ToolIcon({ tool, size = 18, className = 'tool-icon', ...rest }: 
           <rect x="3" y="5" width="18" height="14" rx="1" />
         </svg>
       );
+    case 'ellipse':
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} {...rest}><ellipse cx="12" cy="12" rx="10" ry="6" /></svg>;
     case 'circle':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>

@@ -11,11 +11,12 @@ const suffix = { inches: 'in', feet: 'ft', millimeters: 'mm', meters: 'm' };
 export function ProximityGuides() {
   const visible = useEditorStore(state => state.showProximityGuides);
   const dragged = useEditorStore(state => state.proximityShape);
+  const selectedIds = useEditorStore(state => state.selectedIds);
   const scale = useEditorStore(state => state.scale);
   const unit = useEditorStore(state => state.displayUnit);
   const shapes = useDrawingStore(state => state.document.shapes);
   const guides = useMemo(() => visible && dragged && shapes.some(shape => shape.id === dragged.id)
-    ? calculateProximityGuides(proximityBounds(dragged), shapes, dragged.id) : [], [visible, dragged, shapes]);
+    ? calculateProximityGuides(proximityBounds(dragged), shapes.filter(shape => !selectedIds.includes(shape.id)), dragged.id) : [], [visible, dragged, shapes, selectedIds]);
 
   return <Group listening={false} name="proximity-guides">
     {guides.map(guide => {

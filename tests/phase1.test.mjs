@@ -235,17 +235,17 @@ test('Phase 2 shapes validate and survive a drawing roundtrip', () => {
   const types = ['square', 'ellipse', 'triangle', 'arc'];
   const document = drawing();
   types.forEach((type) => document.shapes.push({ ...shape, id: `phase2-${type}`, type, rotation: 45, ...(type === 'arc' ? { startAngle: 30, endAngle: 270 } : {}) }));
-  document.shapes.push({ ...shape, id: 'line', type: 'line', points: [{ x: 0, y: 0 }, { x: 3048, y: 304.8 }] });
-  document.shapes.push({ ...shape, id: 'polyline', type: 'polyline', points: [{ x: 0, y: 0 }, { x: 100, y: 200 }, { x: 300, y: 50 }] });
-  document.shapes.push({ ...shape, id: 'polygon', type: 'polygon', points: [{ x: 0, y: 0 }, { x: 100, y: 200 }, { x: 300, y: 50 }] });
+  document.shapes.push({ ...shape, id: 'line', type: 'line', points: [0, 0, 3048, 304.8] });
+  document.shapes.push({ ...shape, id: 'polyline', type: 'polyline', points: [0, 0, 100, 200, 300, 50] });
+  document.shapes.push({ ...shape, id: 'polygon', type: 'polygon', points: [0, 0, 100, 200, 300, 50] });
   assert.deepEqual(decodeDrawing(encodeDrawing(document)), document);
 });
 
 test('Phase 2 rejects missing or oversized point lists and invalid angles', () => {
   for (const candidate of [
     { ...shape, type: 'line' },
-    { ...shape, type: 'polyline', points: [{ x: 0, y: 0 }] },
-    { ...shape, type: 'polygon', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] },
+    { ...shape, type: 'polyline', points: [0, 0] },
+    { ...shape, type: 'polygon', points: [0, 0, 1, 1] },
     { ...shape, type: 'line', points: Array(201).fill({ x: 0, y: 0 }) },
     { ...shape, type: 'arc', startAngle: Infinity },
     { ...shape, type: 'square', rotation: NaN },
@@ -281,7 +281,7 @@ test('Phase 2 snaps to nearby shape corners or vertices before falling back to t
   assert.deepEqual(snapToDrawingPoint({ x: 405, y: 95 }, [anchor], 25.4, 12), { x: 400, y: 100 });
   const gridResult = snapToDrawingPoint({ x: 147, y: 153 }, [anchor], 25.4, 12);
   close(gridResult.x, 152.4); close(gridResult.y, 152.4);
-  const path = { ...shape, id: 'path', type: 'polyline', x: 500, y: 0, width: 200, height: 200, points: [{ x: 0, y: 0 }, { x: 125, y: 75 }] };
+  const path = { ...shape, id: 'path', type: 'polyline', x: 500, y: 0, width: 200, height: 200, points: [0, 0, 125, 75] };
   assert.deepEqual(snapToDrawingPoint({ x: 620, y: 70 }, [path], 25.4, 12), { x: 625, y: 75 });
   assert.deepEqual(snapToDrawingPoint({ x: 100, y: 100 }, [anchor], 25.4, 12, 'anchor'), { x: 101.6, y: 101.6 });
 });
@@ -303,13 +303,13 @@ test('Phase 3 walls require approved assembly data, physical thickness, and two 
     type: 'wall',
     wallType: 'interior_partition',
     wallThicknessMm: 101.6,
-    points: [{ x: 0, y: 0 }, { x: 3048, y: 0 }],
+    points: [0, 0, 3048, 0],
   };
   assert.deepEqual(decodeDrawing(encodeDrawing({ ...drawing(), shapes: [wall] })).shapes[0], wall);
   for (const invalid of [
     { ...wall, wallType: 'unknown_wall' },
     { ...wall, wallThicknessMm: 0 },
-    { ...wall, points: [{ x: 0, y: 0 }] },
+    { ...wall, points: [0, 0] },
   ]) assert.throws(() => decodeDrawing(JSON.stringify({ ...drawing(), shapes: [invalid] })));
 });
 
@@ -382,18 +382,18 @@ test('Phase 3 exact wall length preserves the first endpoint, including after ro
     width: 100,
     height: 1,
     rotation: 90,
-    points: [{ x: 100, y: 0 }, { x: 0, y: 0 }],
+    points: [100, 0, 0, 0],
     wallType: 'interior_partition',
     wallThicknessMm: 101.6,
   };
-  const resized = resizeWallToLength(wall, 200);
-  close(wallLength({ ...wall, ...resized }), 200);
-  close(resized.bounds.x + resized.points[0].x * Math.cos(Math.PI / 2) - resized.points[0].y * Math.sin(Math.PI / 2), 100);
-  close(resized.bounds.y + resized.points[0].x * Math.sin(Math.PI / 2) + resized.points[0].y * Math.cos(Math.PI / 2), 200);
+  const resized = resizeWallToLength(wall, 200, 270);
+  close(wallLength({ ...wall, ...resized.bounds, points: resized.points.flatMap(p => [p.x, p.y]) }), 200);
+  close(resized.bounds.x + resized.points[0].x, 100);
+  close(resized.bounds.y + resized.points[0].y, 200);
   const reoriented = resizeWallToLength(wall, 200, 0);
   close(reoriented.bounds.x + reoriented.points[0].x, 100);
   close(reoriented.bounds.y + reoriented.points[0].y, 200);
-  assert.throws(() => resizeWallToLength(wall, 0));
+  assert.deepEqual(resizeWallToLength(wall, 0, 0).points, [{ x: 100, y: 0 }, { x: 0, y: 0 }]);
 });
 
 test('tape-measure endpoints use actual millimeters and snap to visible wall faces', () => {
@@ -405,7 +405,7 @@ test('tape-measure endpoints use actual millimeters and snap to visible wall fac
     y: 100,
     width: 400,
     height: 1,
-    points: [{ x: 0, y: 0 }, { x: 400, y: 0 }],
+    points: [0, 0, 400, 0],
     wallType: 'interior_partition',
     wallThicknessMm: 100,
   };
@@ -414,10 +414,10 @@ test('tape-measure endpoints use actual millimeters and snap to visible wall fac
 });
 
 test('saved tape measurements validate and survive export/import like other drawing shapes', () => {
-  const measurement = { ...shape, id: 'measurement', type: 'measurement', fill: '#dc2626', points: [{ x: 0, y: 0 }, { x: 304.8, y: 0 }] };
+  const measurement = { ...shape, id: 'measurement', type: 'measurement', fill: '#dc2626', points: [0, 0, 304.8, 0] };
   const document = { ...drawing(), shapes: [measurement] };
   assert.deepEqual(decodeDrawing(encodeDrawing(document)), document);
-  assert.throws(() => decodeDrawing(JSON.stringify({ ...document, shapes: [{ ...measurement, points: [{ x: 0, y: 0 }] }] })));
+  assert.throws(() => decodeDrawing(JSON.stringify({ ...document, shapes: [{ ...measurement, points: [0, 0] }] })));
 });
 
 test('furniture uses approved kinds and keeps real-world editable dimensions through export', () => {

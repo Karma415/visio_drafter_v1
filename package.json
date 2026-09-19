@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/phase1.test.mjs",
+    "test": "node --test tests/phase1.test.mjs tests/mega-task.test.mjs tests/epic1.test.mjs",
     "test:browser": "node tests/browser-phase2.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -9,7 +9,7 @@ export function InspectorPanel() {
   const selectedIds = useEditorStore((state) => state.selectedIds);
   const selectedId = selectedIds[0] ?? null;
   const activeTool = useEditorStore((state) => state.activeTool);
-  const selectedShape = activeTool === 'select' ? drawing.shapes.find((shape) => shape.id === selectedId) : undefined;
+  const selectedShape = activeTool === 'select' || activeTool === 'move' ? drawing.shapes.find((shape) => shape.id === selectedId) : undefined;
   return <aside className="inspector" aria-label="Selected object properties">
     <SelectionActions shape={selectedShape} selectedIds={selectedIds} />
     {selectedShape

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { circleWithRadius } from '../../domain/manipulation';
 import type { Shape } from '../../domain/document';
 import { formatMetric, paperMm } from '../../domain/units';
 import { parseInputToMm, formatMmToUnit } from '../../utils/units';
@@ -15,6 +16,7 @@ export function MeasurementPanel({ shape, selectedIds = [], unit }: Props) {
   const displayUnit = useEditorStore((state) => state.displayUnit);
   const [width, setWidth] = useState(formatMmToUnit(shape.width, displayUnit));
   const [height, setHeight] = useState(formatMmToUnit(shape.height, displayUnit));
+  const [radius, setRadius] = useState(formatMmToUnit(shape.width / 2, displayUnit));
   const [x, setX] = useState(formatMmToUnit(shape.x, displayUnit));
   const [y, setY] = useState(formatMmToUnit(shape.y, displayUnit));
   const [rotation, setRotation] = useState(() => {
@@ -42,6 +44,17 @@ export function MeasurementPanel({ shape, selectedIds = [], unit }: Props) {
   const isPath = shape.type === 'line' || shape.type === 'polyline' || shape.type === 'polygon' || shape.type === 'wall' || shape.type === 'measurement';
   return <section aria-labelledby="selection-title">
     <h2 id="selection-title">Selected {shape.type}</h2>
+    {shape.type === 'circle' && <form onSubmit={event => {
+      event.preventDefault();
+      try {
+        useDrawingStore.getState().replaceShapes([circleWithRadius(shape, parseInputToMm(radius, displayUnit, NaN))]);
+        setError('');
+      } catch (problem) { setError(problem instanceof Error ? problem.message : 'Invalid radius.'); }
+    }}>
+      <label>Radius — actual {displayUnit}<input value={radius} inputMode="decimal" onChange={event => setRadius(event.target.value)} /></label>
+      <button type="submit" className="btn-secondary">Apply radius</button>
+      <small>Sets both diameters and preserves the center.</small>
+    </form>}
     <form onSubmit={(event) => {
       event.preventDefault();
       try {

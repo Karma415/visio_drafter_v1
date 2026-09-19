@@ -14,7 +14,7 @@ import { FurnitureIcon } from './FurnitureIcons';
 const TOOLS: { id: ActiveTool; label: string }[] = [
   { id: 'polyline', label: 'Connected line' }, { id: 'polygon', label: 'Polygon' },
   { id: 'square', label: 'Square' }, { id: 'circle', label: 'Circle' }, { id: 'triangle', label: 'Triangle' },
-  { id: 'arc', label: 'Arc' },
+  { id: 'arc', label: 'Arc' }, { id: 'ellipse', label: 'Ellipse' },
   { id: 'furniture', label: 'Furniture' },
   { id: 'door', label: 'Door' },
   { id: 'window', label: 'Window' },
@@ -23,7 +23,7 @@ const TOOLS: { id: ActiveTool; label: string }[] = [
 ];
 const TAB_TOOLS: Record<CommandTab, ActiveTool[]> = {
   file: [],
-  draw: ['polyline', 'polygon', 'square', 'circle', 'triangle', 'arc'],
+  draw: ['polyline', 'polygon', 'square', 'circle', 'ellipse', 'triangle', 'arc'],
   walls: ['door', 'window'],
   annotate: ['measure', 'text'],
   furniture: ['furniture'],
@@ -43,10 +43,15 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   const placedFurnitureKind = useEditorStore((state) => state.placedFurnitureKind);
   const placedDoorType = useEditorStore((state) => state.placedDoorType);
   const [furnitureCategory, setFurnitureCategory] = useState<FurnitureCategory>('furniture');
+  const [searchQueries, setSearchQueries] = useState({ furniture: '', draw: '' });
+  const searchTab = activeTab === 'furniture' ? 'furniture' : 'draw';
+  const query = searchQueries[searchTab].trim().toLowerCase();
 
   const tools = TOOLS.filter((tool) => TAB_TOOLS[activeTab].includes(tool.id));
+  const filteredTools = tools.filter((tool) => tool.label.toLowerCase().includes(query));
   const categoryFurnitureKinds = FURNITURE_KINDS.filter(
-    (kind) => FURNITURE_DEFINITIONS[kind].category === furnitureCategory,
+    (kind) => FURNITURE_DEFINITIONS[kind].category === furnitureCategory
+      && FURNITURE_DEFINITIONS[kind].label.toLowerCase().includes(query),
   );
 
   return <aside className="sidebar" aria-label="Component library and properties">
@@ -56,6 +61,15 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
     {warning && <div role="alert" className="error"><p>{warning}</p>
       <button type="button" className="btn-warning" onClick={() => useDrawingStore.getState().enableRecovery()}>Resume recovery — replace saved copy</button></div>}
     {(tools.length > 0 || activeTab === 'view' || activeTab === 'furniture' || activeTab === 'walls') && <section aria-label="Component Library">
+      {(activeTab === 'furniture' || activeTab === 'draw') && <label>
+        {activeTab === 'furniture' ? 'Search furniture & equipment' : 'Search shapes'}
+        <input
+          type="search"
+          value={searchQueries[searchTab]}
+          placeholder={activeTab === 'furniture' ? 'Search this category...' : 'Search shapes...'}
+          onChange={(event) => setSearchQueries(previous => ({ ...previous, [searchTab]: event.target.value }))}
+        />
+      </label>}
       {activeTab === 'furniture' ? (
         <>
           <h2>Furniture & Equipment</h2>
@@ -92,6 +106,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
               );
             })}
           </div>
+          {categoryFurnitureKinds.length === 0 && <p className="muted" role="status">No items found</p>}
         </>
       ) : activeTab === 'walls' ? (
         <>
@@ -173,7 +188,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
       ) : tools.length > 0 ? (
         <>
           <h2>{activeTab === 'draw' ? 'Drawing Tools' : 'Tools'}</h2>
-          <div className="library-grid">{tools.map((tool) =>
+          <div className="library-grid">{filteredTools.map((tool) =>
             <button
               key={tool.id}
               type="button"
@@ -186,6 +201,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
               <ToolIcon tool={tool.id} size={28} />
             </button>,
           )}</div>
+          {filteredTools.length === 0 && <p className="muted" role="status">No items found</p>}
         </>
       ) : null}
       <div className="button-row">
@@ -196,7 +212,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
 
       <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
         Unit: 
-        <select value={displayUnit} onChange={(e) => setDisplayUnit(e.target.value as any)}>
+        <select value={displayUnit} onChange={(e) => setDisplayUnit(e.target.value as typeof displayUnit)}>
           <option value="inches">Inches</option>
           <option value="feet">Feet</option>
           <option value="meters">Meters</option>

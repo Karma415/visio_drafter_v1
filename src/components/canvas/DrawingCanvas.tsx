@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Line, Transformer, Rect } from 'react-konva';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { isCenteredShape, isProportionalShape, nodePosition, normalizePoints, screenToWorld, snapOpeningOrigin, snapToDrawingPointWithKind, snapToWallFace, snapToWallPoint, snapWallEndpoint, snappedBounds } from '../../domain/geometry';
+import { isProportionalShape, nodePosition, normalizePoints, screenToWorld, snapOpeningOrigin, snapToDrawingPointWithKind, snapToWallFace, snapToWallPoint, snapWallEndpoint } from '../../domain/geometry';
+import { transformShape } from '../../domain/manipulation';
 import type { Shape, ShapePoint } from '../../domain/document';
 import { WALL_DEFINITIONS } from '../../domain/walls';
 import { FURNITURE_DEFINITIONS } from '../../domain/furniture';
@@ -28,6 +29,7 @@ export function DrawingCanvas() {
   const container = useRef<HTMLDivElement | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const nodes = useRef(new Map<string, ShapeNode>());
+  const transformStart = useRef(new Map<string, { shape: Shape; scaleX: number; scaleY: number }>());
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [draft, setDraft] = useState<{ type: 'line' | 'polyline' | 'polygon' | 'wall'; points: ShapePoint[]; pointer: ShapePoint | null } | null>(null);
   const [dragDraft, setDragDraft] = useState<{ start: ShapePoint; current: ShapePoint } | null>(null);
@@ -49,7 +51,7 @@ export function DrawingCanvas() {
     // react-konva creates child nodes after React has committed selection state.
     // Attaching here makes a just-created or just-selected shape deterministic.
     const editor = useEditorStore.getState();
-    if (editor.activeTool === 'select' && editor.selectedIds.includes(id)) {
+    if ((editor.activeTool === 'select' || editor.activeTool === 'move') && editor.selectedIds.includes(id)) {
       const selectedNodes = editor.selectedIds.map(selectedId => nodes.current.get(selectedId)).filter(Boolean) as Konva.Node[];
       transformerRef.current?.nodes(selectedNodes);
       transformerRef.current?.getLayer()?.batchDraw();
@@ -66,7 +68,7 @@ export function DrawingCanvas() {
   }, []);
 
   useEffect(() => {
-    const selectedNodes = activeTool === 'select' 
+    const selectedNodes = activeTool === 'select' || activeTool === 'move'
       ? selectedIds.map(id => nodes.current.get(id)).filter(Boolean) as Konva.Node[]
       : [];
     transformerRef.current?.nodes(selectedNodes);
@@ -165,7 +167,7 @@ export function DrawingCanvas() {
     const stage = event.target.getStage();
     if (!stage) return;
     const editor = useEditorStore.getState();
-    if (activeTool === 'select' || activeTool === 'text') {
+    if (activeTool === 'select' || activeTool === 'move' || activeTool === 'text') {
       if (event.target === stage) editor.select(null);
       return;
     }
@@ -205,7 +207,7 @@ export function DrawingCanvas() {
       editor.setSnapStatus(snapStatus(snapResult.kind));
       return;
     }
-    let point = world;
+    let point: ShapePoint;
     let snapKind = 'free';
     
     if (activeTool === 'wall' && activeDraft?.type === 'wall' && event.evt.shiftKey && activeDraft.points.length > 0) {
@@ -297,7 +299,7 @@ export function DrawingCanvas() {
         finalKind = openingSnap.kind;
       }
 
-      let payload: any;
+      let payload: Omit<Shape, 'id'>;
       if (activeTool === 'rectangle') {
         payload = { type: 'rectangle', x: placeX, y: placeY, width, height: placeHeight, fill: 'transparent', stroke: '#334155', strokeWidth: 8 };
       } else {
@@ -320,32 +322,28 @@ export function DrawingCanvas() {
     } catch (error) { editor.reportError(error); }
   }
   function transformEnd() {
-    const node = selectedIds.length > 0 ? nodes.current.get(selectedIds[0]) : undefined;
-    const shape = document.shapes.find((item) => item.id === selectedIds[0]);
-    if (!node || !shape) return;
-    const width = node.width() * node.scaleX();
-    const height = node.height() * node.scaleY();
-    const centered = isCenteredShape(shape);
-    const bounds = shape.type === 'measurement' ? {
-      x: node.x() - (centered ? width / 2 : 0), y: node.y() - (centered ? height / 2 : 0), width, height,
-    } : snappedBounds({
-      x: node.x() - (centered ? width / 2 : 0), y: node.y() - (centered ? height / 2 : 0), width, height,
-    }, document.gridMm);
-    node.scale({ x: 1, y: 1 });
+    if (activeTool !== 'select' || !transformStart.current.size) return;
     try {
-      const rotation = shape.type === 'arc'
-        ? node.rotation() - (shape.startAngle ?? 0)
-        : node.rotation();
-      useDrawingStore.getState().updateGeometry(shape.id, bounds, { rotation });
-      if (shape.type === 'wall') {
-        useDrawingStore.getState().mergeWall(shape.id);
-      }
-      node.position(nodePosition({ ...shape, ...bounds }));
-      node.size({ width: bounds.width, height: bounds.height });
+      const changes = [...transformStart.current].map(([id, initial]) => {
+        const node = nodes.current.get(id)!;
+        return transformShape(initial.shape, { position: node.position(),
+          scaleX: node.scaleX() / initial.scaleX, scaleY: node.scaleY() / initial.scaleY,
+          rotation: node.rotation() - (initial.shape.type === 'arc' ? initial.shape.startAngle ?? 0 : 0) });
+      });
+      useDrawingStore.getState().replaceShapes(changes);
     } catch (error) {
-      node.position(nodePosition(shape));
-      node.size({ width: shape.width, height: shape.height });
       useEditorStore.getState().reportError(error);
+    } finally {
+      for (const [id] of transformStart.current) {
+        const node = nodes.current.get(id);
+        const shape = useDrawingStore.getState().document.shapes.find(item => item.id === id);
+        if (!node || !shape) continue;
+        const minimum = Math.min(shape.width, shape.height);
+        node.scale(shape.type === 'triangle' || shape.type === 'arc' ? { x: shape.width / minimum, y: shape.height / minimum } : { x: 1, y: 1 });
+        node.position(nodePosition(shape));
+        node.rotation((shape.rotation ?? 0) + (shape.type === 'arc' ? shape.startAngle ?? 0 : 0));
+      }
+      transformStart.current.clear();
     }
     transformerRef.current?.forceUpdate();
   }
@@ -413,7 +411,7 @@ export function DrawingCanvas() {
       }
     }}>
     <Stage ref={(node) => registerStage(node)} width={size.width} height={size.height} x={position.x} y={position.y}
-      scaleX={scale} scaleY={scale} draggable={activeTool === 'select'}
+      scaleX={scale} scaleY={scale} draggable={activeTool === 'select' || activeTool === 'move'}
       onWheel={wheel} onClick={click} onTap={click}
       onMouseMove={pointerMove} onTouchMove={pointerMove} onDragMove={pan} onDragEnd={pan}
       onMouseDown={(event) => {
@@ -515,7 +513,7 @@ export function DrawingCanvas() {
         {[...document.shapes]
           .sort((a, b) => shapeLayerOrder(a) - shapeLayerOrder(b))
           .map((shape) => <ShapeView key={shape.id} shape={shape} gridMm={document.gridMm} unit={document.displayUnit}
-            selectable={activeTool === 'select'} selected={activeTool === 'select' && selectedIds.includes(shape.id)}
+            selectable={activeTool === 'select' || activeTool === 'move'} selected={(activeTool === 'select' || activeTool === 'move') && selectedIds.includes(shape.id)}
             scale={scale} register={register} />)}
         {activeDraft && <Line points={draftPoints} closed={activeDraft.type === 'polygon'} stroke="#475569" strokeWidth={3 / scale} dash={[8 / scale, 8 / scale]} listening={false} />}
         {measurement && measurementEnd && <MeasurementOverlay start={measurement.start} end={measurementEnd}
@@ -533,8 +531,18 @@ export function DrawingCanvas() {
         )}
         <AlignmentGuides guides={alignmentGuides} scale={scale} viewport={{ position, size }} />
         <ProximityGuides />
-        <Transformer ref={transformerRef} rotateEnabled={selectedShape?.type !== 'measurement'} flipEnabled={false}
-          keepRatio={Boolean(selectedShape && isProportionalShape(selectedShape))}
+        <Transformer ref={transformerRef} rotateEnabled={activeTool === 'select'} resizeEnabled={activeTool === 'select'} flipEnabled={false}
+          enabledAnchors={selectedIds.length > 1 ? ['top-left', 'top-right', 'bottom-left', 'bottom-right'] : ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']}
+          rotateAnchorOffset={30} boundBoxFunc={(oldBox, newBox) => Math.abs(newBox.width) < 2 || Math.abs(newBox.height) < 2 ? oldBox : newBox}
+          onTransformStart={() => {
+            transformStart.current.clear();
+            for (const id of selectedIds) {
+              const shape = document.shapes.find(item => item.id === id);
+              const node = nodes.current.get(id);
+              if (shape && node) transformStart.current.set(id, { shape, scaleX: node.scaleX(), scaleY: node.scaleY() });
+            }
+          }}
+          keepRatio={selectedIds.length > 1 || Boolean(selectedShape && isProportionalShape(selectedShape))}
           ignoreStroke={true} padding={selectedShape?.type === 'measurement' ? 0 : undefined} borderStroke="#1d4ed8" borderStrokeWidth={2}
           anchorStroke="#1d4ed8" anchorStrokeWidth={2} anchorFill="#ffffff" anchorSize={12}
           onTransformEnd={transformEnd} />
@@ -542,6 +550,6 @@ export function DrawingCanvas() {
     </Stage>
     {activeDraft && <button className="draft-cancel" type="button" onClick={cancelDraft}>Cancel drawing (Esc)</button>}
     {measurement && <button className="draft-cancel" type="button" onClick={() => { setMeasurement(null); useEditorStore.getState().setSnapStatus(null); }}>Clear measurement (Esc)</button>}
-    <p className="canvas-help">{activeTool === 'measure' ? (measurement ? 'Move to the second point, then click to save the measurement. Escape cancels.' : 'Click two points to create a saved measurement. Select and delete it like any other shape.') : activeDraft ? (activeDraft.type === 'line' || activeDraft.type === 'wall' ? `Click the second point to finish the ${activeDraft.type}. Escape cancels.` : 'Click to add points. Double-click or Enter finishes; Escape cancels.') : activeTool === 'select' ? 'Select a shape. Drag the background to pan; scroll to zoom.' : `Click the canvas to place ${activeTool === 'text' ? 'text' : `a ${activeTool}`}.`}</p>
+    <p className="canvas-help">{activeTool === 'measure' ? (measurement ? 'Move to the second point, then click to save the measurement. Escape cancels.' : 'Click two points to create a saved measurement. Select and delete it like any other shape.') : activeDraft ? (activeDraft.type === 'line' || activeDraft.type === 'wall' ? `Click the second point to finish the ${activeDraft.type}. Escape cancels.` : 'Click to add points. Double-click or Enter finishes; Escape cancels.') : activeTool === 'move' ? 'Move only: drag selected objects to translate them. M selects Move; V selects resize and rotate controls.' : activeTool === 'select' ? 'Select a shape. Drag the background to pan; scroll to zoom.' : `Click the canvas to place ${activeTool === 'text' ? 'text' : `a ${activeTool}`}.`}</p>
   </div>;
 }

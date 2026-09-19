@@ -1,8 +1,14 @@
 import type { Shape } from '../../domain/document';
+import { useState } from 'react';
+import { parseInputToMm } from '../../utils/units';
+import { runSelectionCommand } from '../../services/selectionCommands';
 import { useDrawingStore } from '../../store/useDrawingStore';
 import { useEditorStore } from '../../store/useEditorStore';
 
 export function SelectionActions({ shape, selectedIds = [] }: { shape: Shape | undefined, selectedIds?: string[] }) {
+  const [gap, setGap] = useState('');
+  const unit = useEditorStore(state => state.displayUnit);
+  const perform = (action: () => void) => { try { action(); } catch (error) { useEditorStore.getState().reportError(error); } };
   const drawing = useDrawingStore.getState().document;
   const allSelectedShapes = selectedIds.map(id => drawing.shapes.find(s => s.id === id)).filter(Boolean) as Shape[];
   const allWalls = allSelectedShapes.length > 1 && allSelectedShapes.every(s => s.type === 'wall');
@@ -24,9 +30,23 @@ export function SelectionActions({ shape, selectedIds = [] }: { shape: Shape | u
         }}>Group Walls</button>
       )}
       <button type="button" className="btn-destructive" onClick={() => {
-        selectedIds.forEach(id => useDrawingStore.getState().deleteShape(id));
-        useEditorStore.getState().select(null);
+        runSelectionCommand('delete');
       }}>Delete selected</button>
     </div>}
+    {selectedIds.length >= 2 && <div className="button-row" aria-label="Align selection">
+      {(['top', 'bottom', 'left', 'right'] as const).map(edge => <button key={edge} type="button" className="btn-secondary"
+        onClick={() => perform(() => useDrawingStore.getState().alignSelection(selectedIds, edge))}>Align {edge}</button>)}
+    </div>}
+    {selectedIds.length >= 3 && <>
+      <label>Spacing gap — {unit}<input value={gap} placeholder="Automatic" inputMode="decimal" onChange={event => setGap(event.target.value)} /></label>
+      <div className="button-row">
+        {(['horizontal', 'vertical'] as const).map(axis => <button key={axis} type="button" className="btn-secondary"
+          onClick={() => perform(() => {
+            const gapMm = gap.trim() ? parseInputToMm(gap, unit, NaN) : undefined;
+            useDrawingStore.getState().distributeSelection(selectedIds, axis, gapMm);
+          })}>Distribute {axis === 'horizontal' ? 'horizontally' : 'vertically'}</button>)}
+      </div>
+      <small>Leave blank for equal gaps within the current span. An explicit gap keeps the first item fixed.</small>
+    </>}
   </section>;
 }

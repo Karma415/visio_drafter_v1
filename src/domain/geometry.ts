@@ -193,7 +193,7 @@ export function resizeWallToLength(shape: Shape, nextLengthMm: number, targetAng
   // 2. We want to physically rotate all points around `start` by the difference between targetAngle and currentAngle.
   // Wait, if the shape had a Konva rotation previously, its true world angle was (currentAngle + shape.rotation).
   const worldCurrentAngleDeg = (currentAngleRad * 180 / Math.PI) + (shape.rotation ?? 0);
-  let deltaDeg = targetAngleDeg - worldCurrentAngleDeg;
+  const deltaDeg = targetAngleDeg - worldCurrentAngleDeg;
   const deltaRad = deltaDeg * Math.PI / 180;
   
   // 3. Scale factor for the first segment
@@ -278,10 +278,10 @@ export function snapWallEndpoint(point: ShapePoint, fixedEndpoint: ShapePoint, s
     const distEnd = Math.hypot(end.x - point.x, end.y - point.y);
     if (distStart <= thresholdMm && distStart < distance + 1) {
       target = start;
-      distance = distStart;
+
     } else if (distEnd <= thresholdMm && distEnd < distance + 1) {
       target = end;
-      distance = distEnd;
+
     }
     
     const face = getBoundarySnapPoint(target, fixedEndpoint, start, end, shape.wallThicknessMm ?? 101.6);
@@ -618,10 +618,10 @@ export function snapWallOrigin(origin: ShapePoint, draggedWall: Shape, shapes: S
       const distEnd = Math.hypot(end.x - movedEndpoint.x, end.y - movedEndpoint.y);
       if (distStart <= thresholdMm && distStart < distance + 1) {
         target = start;
-        distance = distStart;
+
       } else if (distEnd <= thresholdMm && distEnd < distance + 1) {
         target = end;
-        distance = distEnd;
+
       }
 
       const boundaryPoint = getBoundarySnapPoint(target, approachPoint, start, end, shape.wallThicknessMm ?? 101.6);
@@ -654,7 +654,7 @@ export function mergeMatchingWalls(document: DrawingDocument, targetId: string):
 
   let currentPoints = getShapePoints(target).map(p => ({ x: target.x + p.x, y: target.y + p.y }));
   let didMerge = false;
-  let remainingShapes = document.shapes.filter(s => s.id !== targetId);
+  const remainingShapes = document.shapes.filter(s => s.id !== targetId);
 
   let canMerge = true;
   while (canMerge) {

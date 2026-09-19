@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Arc, Ellipse, Group, Line, Rect, RegularPolygon, Text } from 'react-konva';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -33,6 +33,7 @@ function offsetLine(points: number[], offset: number): number[] {
   return points.map((value, index) => value + (index % 2 === 0 ? normalX : normalY));
 }
 export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, register }: Props) {
+  const moving = useRef<Shape[]>([]);
   const ref = useCallback((node: ShapeNode | null) => register(shape.id, node), [register, shape.id]);
   function select(event: KonvaEventObject<MouseEvent | TouchEvent | DragEvent>) {
     if (!selectable) return;
@@ -41,7 +42,37 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
       event.evt.stopPropagation();
     }
     const multi = Boolean(event.evt && (event.evt.shiftKey || event.evt.ctrlKey || event.evt.metaKey));
+    if (!multi && useEditorStore.getState().selectedIds.includes(shape.id)) return;
     useEditorStore.getState().select(shape.id, multi);
+  }
+  function dragStart() {
+    const editor = useEditorStore.getState();
+    moving.current = editor.activeTool === 'move' || editor.selectedIds.length > 1
+      ? useDrawingStore.getState().document.shapes.filter(item => editor.selectedIds.includes(item.id)) : [];
+  }
+  function moveSelection(node: Konva.Node, raw: { x: number; y: number }, commit: boolean): boolean {
+    if (!moving.current.length) return false;
+    const lead = moving.current.find(item => item.id === shape.id);
+    if (!lead) return false;
+    const dx = raw.x - lead.x;
+    const dy = raw.y - lead.y;
+    for (const item of moving.current) {
+      const target = node.getStage()?.findOne((candidate: Konva.Node) => candidate.id() === item.id);
+      target?.position(nodePosition({ ...item, x: item.x + dx, y: item.y + dy }));
+    }
+    if (commit) {
+      try { useDrawingStore.getState().translateShapes(moving.current.map(item => item.id), dx, dy); }
+      catch (error) {
+        for (const item of moving.current) node.getStage()?.findOne((candidate: Konva.Node) => candidate.id() === item.id)?.position(nodePosition(item));
+        useEditorStore.getState().reportError(error);
+      }
+      moving.current = [];
+    } else {
+      useEditorStore.getState().setProximityShape({ ...lead, ...raw });
+      useEditorStore.getState().setAlignmentGuides([]);
+      useEditorStore.getState().setSnapStatus('Move only');
+    }
+    return true;
   }
   function dragEnd(event: KonvaEventObject<DragEvent>) {
     event.cancelBubble = true;
@@ -50,6 +81,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     const node = event.target;
     const offset = isCenteredShape(shape) ? { x: shape.width / 2, y: shape.height / 2 } : { x: 0, y: 0 };
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
+    if (moveSelection(node, raw, true)) return;
     const editorScale = useEditorStore.getState().scale;
     const isOpening = shape.type === 'door' || shape.type === 'window';
     const snapResult = event.evt.altKey
@@ -83,6 +115,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     const node = event.target;
     const offset = isCenteredShape(shape) ? { x: shape.width / 2, y: shape.height / 2 } : { x: 0, y: 0 };
     const raw = { x: node.x() - offset.x, y: node.y() - offset.y };
+    if (moveSelection(node, raw, false)) return;
     if (event.evt.altKey) {
       useEditorStore.getState().setSnapStatus('Free placement (Alt)');
       useEditorStore.getState().setAlignmentGuides([]);
@@ -114,10 +147,10 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
     }
   }
   const nodeProps = {
-    ref, ...nodePosition(shape), rotation: shape.rotation ?? 0, draggable: selectable,
+    ref, id: shape.id, ...nodePosition(shape), rotation: shape.rotation ?? 0, draggable: selectable,
     // Select before Konva decides whether pointer movement is a click or a drag.
     onMouseDown: select, onTouchStart: select,
-    onDragMove: dragMove, onDragEnd: dragEnd,
+    onDragStart: dragStart, onDragMove: dragMove, onDragEnd: dragEnd,
   };
   const props = { ...nodeProps, fill: shape.fill, stroke: selected ? '#1d4ed8' : (shape.stroke ?? undefined), strokeWidth: selected ? Math.max(2 / scale, shape.strokeWidth ?? 0) : (shape.strokeWidth ?? 0) };
   if (shape.type === 'circle' || shape.type === 'ellipse') {
@@ -132,6 +165,7 @@ export function ShapeView({ shape, gridMm, unit, selectable, selected, scale, re
   }
   if (shape.type === 'arc') {
     return <Arc {...props} innerRadius={0} outerRadius={Math.min(shape.width, shape.height) / 2}
+      scaleX={shape.width / Math.min(shape.width, shape.height)} scaleY={shape.height / Math.min(shape.width, shape.height)}
       angle={(shape.endAngle ?? 180) - (shape.startAngle ?? 0)} rotation={(shape.rotation ?? 0) + (shape.startAngle ?? 0)} />;
   }
   if (shape.type === 'line' || shape.type === 'polyline' || shape.type === 'polygon') {

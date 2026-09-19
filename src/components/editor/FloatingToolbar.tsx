@@ -1,4 +1,6 @@
 import { useEditorStore } from '../../store/useEditorStore';
+import { useDrawingStore } from '../../store/useDrawingStore';
+import { runSelectionCommand } from '../../services/selectionCommands';
 
 /**
  * Sleek floating drawing toolbar positioned at top-center of the canvas.
@@ -7,9 +9,16 @@ import { useEditorStore } from '../../store/useEditorStore';
 export function FloatingToolbar() {
   const activeTool = useEditorStore((state) => state.activeTool);
   const setTool = useEditorStore((state) => state.setTool);
+  const hasSelection = useEditorStore(state => state.selectedIds.length > 0);
+  const canPaste = useDrawingStore(state => state.clipboard.length > 0);
 
   return (
     <div className="floating-toolbar" role="toolbar" aria-label="Drawing tools">
+      <button type="button" className="floating-toolbar-btn" aria-pressed={activeTool === 'move'}
+        title="Move only (M)" onClick={() => setTool('move')}>Move</button>
+      {(['copy', 'cut', 'paste', 'duplicate'] as const).map(command => <button key={command}
+        type="button" className="floating-toolbar-btn" disabled={command === 'paste' ? !canPaste : !hasSelection}
+        onClick={() => runSelectionCommand(command)}>{command[0].toUpperCase() + command.slice(1)}</button>)}
       <button
         type="button"
         className="floating-toolbar-btn"

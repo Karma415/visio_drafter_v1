@@ -8,8 +8,8 @@ import { DEFAULT_FURNITURE_KIND } from '../domain/furniture';
 import type { DoorType, WindowType } from '../domain/doors';
 import { DEFAULT_DOOR_TYPE, DEFAULT_WINDOW_TYPE } from '../domain/doors';
 
-export type ActiveTool = 'select' | 'measure' | ShapeType;
-export type SnapStatus = 'Object snap' | 'Wall join snap' | 'Grid snap' | 'Free placement (Alt)' | null;
+export type ActiveTool = 'select' | 'move' | 'measure' | ShapeType;
+export type SnapStatus = 'Object snap' | 'Wall join snap' | 'Grid snap' | 'Free placement (Alt)' | 'Move only' | null;
 export interface WallDefaults { wallType: WallType; wallThicknessMm: number }
 export const BASE_PIXELS_PER_MM = 96 / 25.4 / 25;
 interface EditorState {
@@ -31,6 +31,7 @@ interface EditorState {
   placedWindowType: WindowType;
   setTool: (tool: ActiveTool) => void;
   select: (id: string | null, multi?: boolean) => void;
+  selectMany: (ids: string[]) => void;
   editText: (id: string | null) => void;
   setViewport: (position: Point, scale: number) => void;
   reportError: (error: unknown) => void;
@@ -56,7 +57,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   placedFurnitureKind: DEFAULT_FURNITURE_KIND,
   placedDoorType: DEFAULT_DOOR_TYPE,
   placedWindowType: DEFAULT_WINDOW_TYPE,
-  setTool: (activeTool) => set({ activeTool, alignmentGuides: [], proximityShape: null, selectedIds: [] }),
+  setTool: (activeTool) => set(state => ({ activeTool, alignmentGuides: [], proximityShape: null,
+    selectedIds: activeTool === 'select' || activeTool === 'move' ? state.selectedIds : [] })),
+  selectMany: selectedIds => set({ selectedIds: [...new Set(selectedIds)], alignmentGuides: [], proximityShape: null }),
   select: (id, multi) => set((state) => {
     if (!id) return { selectedIds: [], alignmentGuides: [], proximityShape: null };
     if (multi) {

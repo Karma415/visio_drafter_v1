@@ -9,8 +9,21 @@ import { hasPoints, isProportionalShape, mergeMatchingWalls, resizeWallToLength,
 import { WALL_DEFINITIONS } from '../domain/walls';
 import type { WallType } from '../domain/walls';
 import { useEditorStore } from './useEditorStore';
+import { alignShapes, distributeShapes } from '../domain/manipulation';
+import type { Alignment, DistributionAxis } from '../domain/manipulation';
 
 interface DrawingState {
+  clipboard: Shape[];
+  pasteCount: number;
+  copyShapes: (ids: string[]) => void;
+  cutShapes: (ids: string[]) => void;
+  pasteShapes: () => string[];
+  duplicateShapes: (ids: string[]) => string[];
+  replaceShapes: (shapes: Shape[]) => void;
+  translateShapes: (ids: string[], dx: number, dy: number) => void;
+  alignSelection: (ids: string[], alignment: Alignment) => void;
+  distributeSelection: (ids: string[], axis: DistributionAxis, gapMm?: number) => void;
+  deleteShapes: (ids: string[]) => void;
   document: DrawingDocument;
   past: DrawingDocument[];
   future: DrawingDocument[];
@@ -78,7 +91,45 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     }
     return { ...shape, ...nextBounds };
   }
+  const selected = (ids: string[]) => get().document.shapes.filter(shape => ids.includes(shape.id));
+  function insertCopies(shapes: Shape[], offset: number): string[] {
+    if (!shapes.length) return [];
+    const copies = shapes.map(shape => validateShape({ ...structuredClone(shape), id: crypto.randomUUID(), x: shape.x + offset, y: shape.y + offset }));
+    commit(document => ({ ...document, shapes: [...document.shapes, ...copies] }));
+    return copies.map(shape => shape.id);
+  }
   return {
+    clipboard: [], pasteCount: 0,
+    copyShapes: ids => {
+      const shapes = selected(ids);
+      if (shapes.length) set({ clipboard: structuredClone(shapes), pasteCount: 0 });
+    },
+    cutShapes: ids => {
+      const shapes = selected(ids);
+      if (!shapes.length) return;
+      get().deleteShapes(ids);
+      set({ clipboard: structuredClone(shapes), pasteCount: 0 });
+    },
+    pasteShapes: () => {
+      const state = get();
+      const ids = insertCopies(state.clipboard, state.document.gridMm * (state.pasteCount + 1));
+      if (ids.length) set({ pasteCount: state.pasteCount + 1 });
+      return ids;
+    },
+    duplicateShapes: ids => insertCopies(selected(ids), get().document.gridMm),
+    replaceShapes: shapes => {
+      const changes = new Map(shapes.map(shape => [shape.id, validateShape(shape)]));
+      commit(document => !document.shapes.some(shape => changes.has(shape.id)) ? document : ({ ...document,
+        shapes: document.shapes.map(shape => changes.get(shape.id) ?? shape) }));
+    },
+    translateShapes: (ids, dx, dy) => {
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) throw new Error('Move distance must be finite.');
+      if (dx || dy) get().replaceShapes(selected(ids).map(shape => ({ ...shape, x: shape.x + dx, y: shape.y + dy })));
+    },
+    alignSelection: (ids, alignment) => { const shapes = selected(ids); if (shapes.length >= 2) get().replaceShapes(alignShapes(shapes, alignment)); },
+    distributeSelection: (ids, axis, gapMm) => { const shapes = selected(ids); if (shapes.length >= 3) get().replaceShapes(distributeShapes(shapes, axis, gapMm)); },
+    deleteShapes: ids => commit(document => document.shapes.some(shape => ids.includes(shape.id))
+      ? { ...document, shapes: document.shapes.filter(shape => !ids.includes(shape.id)) } : document),
     document: recovery.document, past: [], future: [],
     recoveryWarning: recovery.warning, recoveryEnabled: recovery.enabled,
     enableRecovery: () => set({ recoveryEnabled: true, recoveryWarning: null }),
