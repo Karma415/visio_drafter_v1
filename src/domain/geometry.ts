@@ -1,5 +1,5 @@
-import type { Bounds, Shape, ShapePoint } from './document';
-import { MIN_SIZE_MM } from './document';
+import type { Bounds, Shape, ShapePoint, DrawingDocument } from './document';
+import { getShapePoints, MIN_SIZE_MM } from './document';
 
 export interface Point { x: number; y: number }
 export const snap = (value: number, grid: number) => Math.round(value / grid) * grid;
@@ -56,7 +56,8 @@ export function shapeSnapPoints(shape: Shape): ShapePoint[] {
     { x: shape.x + shape.width, y: shape.y + shape.height },
     { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 },
   ];
-  return shape.points ? [...corners, ...shape.points.map((point) => ({ x: shape.x + point.x, y: shape.y + point.y }))] : corners;
+  const pts = getShapePoints(shape);
+  return pts.length > 0 ? [...corners, ...pts.map((point) => ({ x: shape.x + point.x, y: shape.y + point.y }))] : corners;
 }
 
 export type SnapKind = 'object' | 'wall' | 'grid';
@@ -87,7 +88,7 @@ export function snapToDrawingPoint(point: ShapePoint, shapes: Shape[], gridMm: n
 
 function worldWallPoints(shape: Shape): ShapePoint[] {
   return shape.type === 'wall'
-    ? (shape.points ?? []).map((point) => ({ x: shape.x + point.x, y: shape.y + point.y }))
+    ? getShapePoints(shape).map((point) => ({ x: shape.x + point.x, y: shape.y + point.y }))
     : [];
 }
 
@@ -101,11 +102,54 @@ export function closestPointOnSegment(point: ShapePoint, start: ShapePoint, end:
   return { x: start.x + dx * ratio, y: start.y + dy * ratio };
 }
 
+export function getBoundarySnapPoint(targetCenter: ShapePoint, approachPoint: ShapePoint, start: ShapePoint, end: ShapePoint, thickness: number): ShapePoint {
+  const wallDx = end.x - start.x;
+  const wallDy = end.y - start.y;
+  const len = Math.hypot(wallDx, wallDy);
+  if (len === 0) return targetCenter;
+
+  const nx = -wallDy / len;
+  const ny = wallDx / len;
+  const offset = thickness / 2;
+
+  const dx = approachPoint.x - targetCenter.x;
+  const dy = approachPoint.y - targetCenter.y;
+  if (dx === 0 && dy === 0) return targetCenter;
+  
+  const dLen = Math.hypot(dx, dy);
+  const dirX = dx / dLen;
+  const dirY = dy / dLen;
+  
+  const dotN = dirX * nx + dirY * ny;
+  const t_side = Math.abs(dotN) > 1e-6 ? offset / Math.abs(dotN) : Infinity;
+  
+  const distStart = Math.hypot(targetCenter.x - start.x, targetCenter.y - start.y);
+  const distEnd = Math.hypot(targetCenter.x - end.x, targetCenter.y - end.y);
+  
+  const wallDirX = wallDx / len;
+  const wallDirY = wallDy / len;
+  const dotW = dirX * wallDirX + dirY * wallDirY;
+  
+  let t_end = Infinity;
+  if (dotW > 1e-6) {
+    t_end = distEnd / dotW;
+  } else if (dotW < -1e-6) {
+    t_end = distStart / Math.abs(dotW);
+  }
+  
+  const t = Math.min(t_side, t_end);
+  
+  return {
+    x: targetCenter.x + dirX * t,
+    y: targetCenter.y + dirY * t
+  };
+}
+
 /**
  * The visible face nearest a connecting wall endpoint. Wall paths are stored
  * as centerlines; this converts a finite centerline point into one side face.
  */
-function nearestWallFace(centerlinePoint: ShapePoint, connectingPoint: ShapePoint, start: ShapePoint, end: ShapePoint, thicknessMm: number): ShapePoint {
+export function nearestWallFace(centerlinePoint: ShapePoint, connectingPoint: ShapePoint, start: ShapePoint, end: ShapePoint, thicknessMm: number): ShapePoint {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const length = Math.hypot(dx, dy);
@@ -121,7 +165,9 @@ function nearestWallFace(centerlinePoint: ShapePoint, connectingPoint: ShapePoin
 
 /** Nearest visible face for measurement endpoints that have no direction yet. */
 export function snapToWallFace(point: ShapePoint, shapes: Shape[], gridMm: number, thresholdMm: number): SnapResult {
-  const ordinary = snapToDrawingPointWithKind(point, shapes, gridMm, thresholdMm);
+  // Exclude walls from ordinary snapping so we don't accidentally snap to a wall's centerline/endpoint
+  const nonWallShapes = shapes.filter(s => s.type !== 'wall');
+  const ordinary = snapToDrawingPointWithKind(point, nonWallShapes, gridMm, thresholdMm);
   let candidate: ShapePoint | null = null;
   let closestDistance = thresholdMm;
   for (const shape of shapes) {
@@ -154,40 +200,73 @@ export function distanceBetween(start: ShapePoint, end: ShapePoint): number {
 }
 
 export function wallLength(shape: Shape): number {
-  if (shape.type !== 'wall' || !shape.points || shape.points.length < 2) return 0;
-  return distanceBetween(shape.points[0], shape.points[1]);
+  const pts = getShapePoints(shape);
+  if (shape.type !== 'wall' || pts.length < 2) return 0;
+  return distanceBetween(pts[0], pts[1]);
 }
 
 /**
  * Changes a wall's centerline length while preserving its first endpoint and
  * direction. The root-origin adjustment keeps that promise after rotation.
  */
-export function resizeWallToLength(shape: Shape, nextLengthMm: number, nextRotation = shape.rotation ?? 0): { bounds: Bounds; points: ShapePoint[] } {
-  if (shape.type !== 'wall' || !shape.points || shape.points.length < 2 || !Number.isFinite(nextLengthMm) || nextLengthMm < MIN_SIZE_MM) {
-    throw new Error('Enter a positive wall length.');
+export function resizeWallToLength(shape: Shape, nextLengthMm: number, targetAngleDeg: number): { bounds: Bounds; points: ShapePoint[]; rotation: number } {
+  const pts = getShapePoints(shape);
+  if (shape.type !== 'wall' || pts.length < 2 || !Number.isFinite(nextLengthMm) || nextLengthMm < MIN_SIZE_MM) {
+    return { bounds: { x: shape.x, y: shape.y, width: shape.width, height: shape.height }, points: pts, rotation: shape.rotation ?? 0 };
   }
-  const [start, end] = shape.points;
+  
+  const start = pts[0];
+  const end = pts[1];
+  
+  // 1. Calculate current length and angle of the FIRST segment
   const currentLength = distanceBetween(start, end);
   if (currentLength < MIN_SIZE_MM) throw new Error('This wall has no usable direction.');
-  const rawPoints = [start, {
-    x: start.x + (end.x - start.x) / currentLength * nextLengthMm,
-    y: start.y + (end.y - start.y) / currentLength * nextLengthMm,
-  }];
+  
+  const currentAngleRad = Math.atan2(end.y - start.y, end.x - start.x);
+  
+  // 2. We want to physically rotate all points around `start` by the difference between targetAngle and currentAngle.
+  // Wait, if the shape had a Konva rotation previously, its true world angle was (currentAngle + shape.rotation).
+  const worldCurrentAngleDeg = (currentAngleRad * 180 / Math.PI) + (shape.rotation ?? 0);
+  let deltaDeg = targetAngleDeg - worldCurrentAngleDeg;
+  const deltaRad = deltaDeg * Math.PI / 180;
+  
+  // 3. Scale factor for the first segment
+  const scale = nextLengthMm / currentLength;
+  
+  // 4. Update points
+  const rawPoints = pts.map((p) => {
+    // We only scale the distance of the FIRST segment if requested.
+    // For a multi-segment wall, stretching just the first segment might detach it from the rest,
+    // so we scale the whole polyline relative to start.
+    const dx = (p.x - start.x) * scale;
+    const dy = (p.y - start.y) * scale;
+    
+    // Rotate
+    const rx = dx * Math.cos(deltaRad) - dy * Math.sin(deltaRad);
+    const ry = dx * Math.sin(deltaRad) + dy * Math.cos(deltaRad);
+    
+    return { x: start.x + rx, y: start.y + ry };
+  });
+  
   const normalized = normalizePoints(rawPoints);
+  
+  // 5. Keep the original world coordinate of the start point
   const oldRadians = (shape.rotation ?? 0) * Math.PI / 180;
-  const newRadians = nextRotation * Math.PI / 180;
-  const originalFirstEndpoint = {
+  const originalWorldStart = {
     x: shape.x + start.x * Math.cos(oldRadians) - start.y * Math.sin(oldRadians),
     y: shape.y + start.x * Math.sin(oldRadians) + start.y * Math.cos(oldRadians),
   };
-  const nextFirstEndpoint = normalized.points[0];
+  
+  // New normalized points have NO Konva rotation, so their world start is just shape.x + points[0].x
   const shiftedOrigin = {
-    x: originalFirstEndpoint.x - nextFirstEndpoint.x * Math.cos(newRadians) + nextFirstEndpoint.y * Math.sin(newRadians),
-    y: originalFirstEndpoint.y - nextFirstEndpoint.x * Math.sin(newRadians) - nextFirstEndpoint.y * Math.cos(newRadians),
+    x: originalWorldStart.x - normalized.points[0].x,
+    y: originalWorldStart.y - normalized.points[0].y,
   };
+  
   return {
     bounds: { ...normalized.bounds, x: shiftedOrigin.x, y: shiftedOrigin.y },
     points: normalized.points,
+    rotation: 0 // We physically baked the rotation into the points!
   };
 }
 
@@ -203,10 +282,11 @@ export function snapToWallPoint(point: ShapePoint, shapes: Shape[], gridMm: numb
     if (shape.id === excludeId || shape.type !== 'wall') continue;
     const [start, end] = worldWallPoints(shape);
     if (!start || !end) continue;
-    const closest = closestPointOnSegment(point, start, end);
+    let closest = closestPointOnSegment(point, start, end);
     const distance = Math.hypot(closest.x - point.x, closest.y - point.y);
     if (distance <= closestDistance) {
-      candidate = closest;
+      const thickness = shape.wallThicknessMm ?? 101.6;
+      candidate = getBoundarySnapPoint(closest, point, start, end, thickness);
       closestDistance = distance;
     }
   }
@@ -215,8 +295,8 @@ export function snapToWallPoint(point: ShapePoint, shapes: Shape[], gridMm: numb
     : ordinary;
 }
 
-/** Snap a wall's second endpoint to the visible face of another wall. */
-export function snapWallEndpoint(point: ShapePoint, fixedEndpoint: ShapePoint, shapes: Shape[], gridMm: number, thresholdMm: number, excludeId?: string): SnapResult {
+/** Snap a wall's second endpoint to the exact center/endpoints of another wall. */
+export function snapWallEndpoint(point: ShapePoint, _fixedEndpoint: ShapePoint, shapes: Shape[], gridMm: number, thresholdMm: number, excludeId?: string): SnapResult {
   const ordinary = snapToWallPoint(point, shapes, gridMm, thresholdMm, excludeId);
   let candidate: ShapePoint | null = null;
   let closestDistance = thresholdMm;
@@ -224,11 +304,23 @@ export function snapWallEndpoint(point: ShapePoint, fixedEndpoint: ShapePoint, s
     if (shape.id === excludeId || shape.type !== 'wall') continue;
     const [start, end] = worldWallPoints(shape);
     if (!start || !end) continue;
-    const centerlinePoint = closestPointOnSegment(point, start, end);
-    const face = nearestWallFace(centerlinePoint, fixedEndpoint, start, end, shape.wallThicknessMm ?? 101.6);
-    const distance = Math.hypot(face.x - point.x, face.y - point.y);
+    
+    let target = closestPointOnSegment(point, start, end);
+    let distance = Math.hypot(target.x - point.x, target.y - point.y);
+
+    const distStart = Math.hypot(start.x - point.x, start.y - point.y);
+    const distEnd = Math.hypot(end.x - point.x, end.y - point.y);
+    if (distStart <= thresholdMm && distStart < distance + 1) {
+      target = start;
+      distance = distStart;
+    } else if (distEnd <= thresholdMm && distEnd < distance + 1) {
+      target = end;
+      distance = distEnd;
+    }
+    
     if (distance <= closestDistance) {
-      candidate = face;
+      const thickness = shape.wallThicknessMm ?? 101.6;
+      candidate = getBoundarySnapPoint(target, _fixedEndpoint, start, end, thickness);
       closestDistance = distance;
     }
   }
@@ -417,11 +509,20 @@ export function snapOpeningOrigin(origin: ShapePoint, draggedOpening: Shape, sha
       const wallAngleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) % 360 + 360) % 360;
       const diff1 = Math.abs((((currentRotation - wallAngleDeg) % 360) + 540) % 360 - 180);
       const diff2 = Math.abs((((currentRotation - (wallAngleDeg + 180)) % 360) + 540) % 360 - 180);
-      const targetRotation = diff2 < diff1 ? (wallAngleDeg + 180) % 360 : wallAngleDeg;
+      let targetRotation = diff2 < diff1 ? (wallAngleDeg + 180) % 360 : wallAngleDeg;
+
+      // Enforce strict 90-degree snapping
+      const snapAngles = [0, 90, 180, 270, 360];
+      for (const angle of snapAngles) {
+        if (Math.abs(targetRotation - angle) <= 3 || Math.abs(targetRotation - (angle - 360)) <= 3) {
+          targetRotation = angle % 360;
+          break;
+        }
+      }
 
       bestResult = {
         point: snappedOrigin,
-        rotation: Math.round(targetRotation * 100) / 100,
+        rotation: targetRotation,
         height: thickness,
         kind: 'wall',
       };
@@ -431,7 +532,7 @@ export function snapOpeningOrigin(origin: ShapePoint, draggedOpening: Shape, sha
   return bestResult ?? snapShapeOrigin(origin, draggedOpening, shapes, gridMm, thresholdMm);
 }
 
-/** Move a whole wall so either endpoint joins another wall's centerline. */
+/** Move a whole wall so either endpoint joins another wall's centerline or endpoint exactly. */
 export function snapWallOrigin(origin: ShapePoint, draggedWall: Shape, shapes: Shape[], gridMm: number, thresholdMm: number): SnapResult {
   const localEndpoints = worldWallPoints({ ...draggedWall, x: 0, y: 0 });
   let result: ShapePoint | null = null;
@@ -440,16 +541,28 @@ export function snapWallOrigin(origin: ShapePoint, draggedWall: Shape, shapes: S
     if (shape.id === draggedWall.id || shape.type !== 'wall') continue;
     const [start, end] = worldWallPoints(shape);
     if (!start || !end) continue;
-    for (const [index, endpoint] of localEndpoints.entries()) {
+    for (const endpoint of localEndpoints) {
       const movedEndpoint = { x: origin.x + endpoint.x, y: origin.y + endpoint.y };
-      const otherEndpoint = localEndpoints[index === 0 ? 1 : 0];
-      if (!otherEndpoint) continue;
-      const movedOtherEndpoint = { x: origin.x + otherEndpoint.x, y: origin.y + otherEndpoint.y };
-      const centerlinePoint = closestPointOnSegment(movedEndpoint, start, end);
-      const face = nearestWallFace(centerlinePoint, movedOtherEndpoint, start, end, shape.wallThicknessMm ?? 101.6);
-      const distance = Math.hypot(face.x - movedEndpoint.x, face.y - movedEndpoint.y);
+      const otherEndpoint = localEndpoints.find(e => e !== endpoint) || { x: 0, y: 0 };
+      const approachPoint = { x: origin.x + otherEndpoint.x, y: origin.y + otherEndpoint.y };
+
+      let target = closestPointOnSegment(movedEndpoint, start, end);
+      let distance = Math.hypot(target.x - movedEndpoint.x, target.y - movedEndpoint.y);
+
+      const distStart = Math.hypot(start.x - movedEndpoint.x, start.y - movedEndpoint.y);
+      const distEnd = Math.hypot(end.x - movedEndpoint.x, end.y - movedEndpoint.y);
+      if (distStart <= thresholdMm && distStart < distance + 1) {
+        target = start;
+        distance = distStart;
+      } else if (distEnd <= thresholdMm && distEnd < distance + 1) {
+        target = end;
+        distance = distEnd;
+      }
+
       if (distance <= closestDistance) {
-        result = { x: face.x - endpoint.x, y: face.y - endpoint.y };
+        const thickness = shape.wallThicknessMm ?? 101.6;
+        const boundaryPoint = getBoundarySnapPoint(target, approachPoint, start, end, thickness);
+        result = { x: boundaryPoint.x - endpoint.x, y: boundaryPoint.y - endpoint.y };
         closestDistance = distance;
       }
     }
@@ -469,4 +582,70 @@ export function snappedBounds(bounds: Bounds, grid: number): Bounds {
 /** Thin the visible grid at distant zoom levels without changing the snap interval. */
 export function visibleGridStep(gridMm: number, pixelsPerMm: number): number {
   return gridMm * 2 ** Math.max(0, Math.ceil(Math.log2(12 / (gridMm * pixelsPerMm))));
+}
+export function mergeMatchingWalls(document: DrawingDocument, targetId: string): DrawingDocument {
+  const target = document.shapes.find(s => s.id === targetId);
+  if (!target || target.type !== 'wall') return document;
+
+  let currentPoints = getShapePoints(target).map(p => ({ x: target.x + p.x, y: target.y + p.y }));
+  let didMerge = false;
+  let remainingShapes = document.shapes.filter(s => s.id !== targetId);
+
+  let canMerge = true;
+  while (canMerge) {
+    canMerge = false;
+    for (let i = 0; i < remainingShapes.length; i++) {
+      const shape = remainingShapes[i];
+      if (shape.type !== 'wall') continue;
+      
+      const shapePoints = getShapePoints(shape).map(p => ({ x: shape.x + p.x, y: shape.y + p.y }));
+      const targetStart = currentPoints[0];
+      const targetEnd = currentPoints[currentPoints.length - 1];
+      const shapeStart = shapePoints[0];
+      const shapeEnd = shapePoints[shapePoints.length - 1];
+      
+      const EPSILON = 0.001;
+      const match = (p1: ShapePoint | undefined, p2: ShapePoint | undefined) => p1 && p2 && Math.hypot(p1.x - p2.x, p1.y - p2.y) < EPSILON;
+      
+      if (match(targetEnd, shapeStart)) {
+        currentPoints = [...currentPoints, ...shapePoints.slice(1)];
+        remainingShapes.splice(i, 1);
+        canMerge = true;
+        didMerge = true;
+        break;
+      } else if (match(targetEnd, shapeEnd)) {
+        currentPoints = [...currentPoints, ...shapePoints.slice(0, -1).reverse()];
+        remainingShapes.splice(i, 1);
+        canMerge = true;
+        didMerge = true;
+        break;
+      } else if (match(targetStart, shapeEnd)) {
+        currentPoints = [...shapePoints.slice(0, -1), ...currentPoints];
+        remainingShapes.splice(i, 1);
+        canMerge = true;
+        didMerge = true;
+        break;
+      } else if (match(targetStart, shapeStart)) {
+        currentPoints = [...shapePoints.slice(1).reverse(), ...currentPoints];
+        remainingShapes.splice(i, 1);
+        canMerge = true;
+        didMerge = true;
+        break;
+      }
+    }
+  }
+
+  if (!didMerge) return document;
+
+  const normalized = normalizePoints(currentPoints);
+  const mergedWall: Shape = {
+    ...target,
+    ...normalized.bounds,
+    points: normalized.points.flatMap(p => [p.x, p.y])
+  };
+
+  return {
+    ...document,
+    shapes: [...remainingShapes, mergedWall]
+  };
 }

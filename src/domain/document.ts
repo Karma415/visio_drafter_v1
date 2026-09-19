@@ -32,13 +32,29 @@ export interface ShapePoint {
   y: number;
 }
 
+export function getShapePoints(shape: { points?: number[] }): ShapePoint[] {
+  if (!shape.points) return [];
+  const pts: ShapePoint[] = [];
+  for (let i = 0; i < shape.points.length; i += 2) {
+    pts.push({ x: shape.points[i] ?? 0, y: shape.points[i + 1] ?? 0 });
+  }
+  return pts;
+}
+
+export function flatShapePoints(points: ShapePoint[]): number[] {
+  return points.flatMap((p) => [p.x, p.y]);
+}
+
 export interface Shape extends Bounds {
   id: string;
   type: ShapeType;
   fill: string;
+  stroke?: string;
+  strokeWidth?: number;
   text?: string;
+  fontSize?: number;
   /** Local points, relative to the shape's top-left bounds, for line-based shapes. */
-  points?: ShapePoint[];
+  points?: number[];
   /** Degrees clockwise. Zero is the unrotated shape. */
   rotation?: number;
   /** Arc angles in degrees, used only by arc shapes. */

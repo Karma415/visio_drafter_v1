@@ -1,40 +1,69 @@
 import { useRef, useState } from 'react';
-import type { DrawingDocument } from '../../domain/document';
-import { readDrawing, downloadDrawing } from '../../services/drawingFiles';
-import { useDrawingStore } from '../../store/useDrawingStore';
+import { saveProject, loadProjectFile, exportImage } from '../../services/projectFiles';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Modal } from './Modal';
 
 export function FileControls() {
-  const input = useRef<HTMLInputElement | null>(null);
-  const [pending, setPending] = useState<DrawingDocument | null>(null);
-  const [reading, setReading] = useState(false);
-  function save() {
-    try { downloadDrawing(useDrawingStore.getState().document); }
-    catch (error) { useEditorStore.getState().reportError(error); }
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setLoading(true);
+    try {
+      await loadProjectFile(file);
+    } catch (err) {
+      useEditorStore.getState().reportError(err);
+    } finally {
+      setLoading(false);
+    }
   }
-  return <section>
-    <h2>Drawing file</h2>
-    <div className="button-row"><button type="button" className="btn-secondary" onClick={save}>Download drawing</button>
-      <button type="button" className="btn-secondary" disabled={reading} onClick={() => input.current?.click()}>{reading ? 'Reading…' : 'Open drawing'}</button></div>
-    <input ref={input} type="file" accept=".json,application/json" hidden onChange={async (event) => {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      if (!file) return;
-      setReading(true);
-      try { setPending(await readDrawing(file)); }
-      catch (error) { useEditorStore.getState().reportError(error); }
-      finally { setReading(false); }
-    }} />
-    <small>Files stay on your computer. Choose an E: folder in your browser's download settings. Download regularly; browser recovery is not a permanent backup.</small>
-    {pending && <Modal title="Open drawing?" onCancel={() => setPending(null)}>
-      <p>Open “{pending.name}” ({pending.shapes.length} shapes)? This replaces the current canvas. Download the current drawing first if you want a separate copy.</p>
-      <div className="button-row"><button type="button" className="btn-secondary" onClick={save}>Download current</button><button type="button" className="btn-secondary" onClick={() => setPending(null)}>Cancel</button>
-        <button type="button" className="btn-primary" onClick={() => {
-          useDrawingStore.getState().openDocument(pending);
-          useEditorStore.getState().resetView();
-          setPending(null);
-        }}>Open</button></div>
-    </Modal>}
-  </section>;
+
+  return (
+    <section aria-label="Project and file management">
+      <h2>Project Files</h2>
+      <div className="button-row" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={saveProject}
+          style={{ width: '100%' }}
+        >
+          Save Project
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={loading}
+          onClick={() => fileInputRef.current?.click()}
+          style={{ width: '100%' }}
+        >
+          {loading ? 'Reading…' : 'Load Project'}
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={exportImage}
+          style={{ width: '100%' }}
+        >
+          Export Image
+        </button>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={handleFileChange}
+      />
+
+      <div style={{ marginTop: '1rem', fontSize: '12px', color: 'var(--cad-text-muted)' }}>
+        <p style={{ margin: '4px 0' }}>• <strong>Save Project</strong>: Downloads full canvas state as <code>floorplan.json</code>.</p>
+        <p style={{ margin: '4px 0' }}>• <strong>Load Project</strong>: Replaces canvas state from a selected <code>.json</code> project file.</p>
+        <p style={{ margin: '4px 0' }}>• <strong>Export Image</strong>: Renders canvas stage to <code>floorplan.png</code>.</p>
+      </div>
+    </section>
+  );
 }

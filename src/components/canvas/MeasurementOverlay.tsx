@@ -20,7 +20,7 @@ export function MeasurementOverlay({ start, end, scale, unit, preview }: Props) 
   const label = `${formatMetric(length, unit)} · ${formatNumber(mmToInches(length))} in`;
   return <>
     <Line points={[start.x, start.y, end.x, end.y]} stroke="#dc2626" strokeWidth={2 / scale}
-      dash={preview ? [8 / scale, 5 / scale] : undefined} listening={false} />
+      dash={preview ? [8 / scale, 5 / scale] : undefined} lineCap="butt" listening={false} />
     <Circle x={start.x} y={start.y} radius={5 / scale} fill="#dc2626" listening={false} />
     <Circle x={end.x} y={end.y} radius={5 / scale} fill="#dc2626" listening={false} />
     <Text x={midX + 8 / scale} y={midY - 24 / scale} text={label} fontSize={fontSize}

@@ -9,20 +9,21 @@ import type { FurnitureCategory } from '../../domain/furniture';
 import { FURNITURE_CATEGORIES, FURNITURE_DEFINITIONS, FURNITURE_KINDS } from '../../domain/furniture';
 import { ToolIcon } from './ToolIcons';
 import { DoorIcon, WindowIcon, OpeningIcon } from './ComponentIcons';
+import { FurnitureIcon } from './FurnitureIcons';
 
 const TOOLS: { id: ActiveTool; label: string }[] = [
   { id: 'polyline', label: 'Connected line' }, { id: 'polygon', label: 'Polygon' },
-  { id: 'circle', label: 'Circle' }, { id: 'triangle', label: 'Triangle' },
+  { id: 'square', label: 'Square' }, { id: 'circle', label: 'Circle' }, { id: 'triangle', label: 'Triangle' },
   { id: 'arc', label: 'Arc' },
   { id: 'furniture', label: 'Furniture' },
   { id: 'door', label: 'Door' },
   { id: 'window', label: 'Window' },
   { id: 'measure', label: 'Measure' },
-  { id: 'text', label: 'Text' },
+  { id: 'text', label: 'Text Label' },
 ];
 const TAB_TOOLS: Record<CommandTab, ActiveTool[]> = {
   file: [],
-  draw: ['polyline', 'polygon', 'circle', 'triangle', 'arc'],
+  draw: ['polyline', 'polygon', 'square', 'circle', 'triangle', 'arc'],
   walls: ['door', 'window'],
   annotate: ['measure', 'text'],
   furniture: ['furniture'],
@@ -36,6 +37,8 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
   const activeTool = useEditorStore((state) => state.activeTool);
   const scale = useEditorStore((state) => state.scale);
   const error = useEditorStore((state) => state.error);
+  const displayUnit = useEditorStore((state) => state.displayUnit);
+  const setDisplayUnit = useEditorStore((state) => state.setDisplayUnit);
   const snapStatus = useEditorStore((state) => state.snapStatus);
   const placedFurnitureKind = useEditorStore((state) => state.placedFurnitureKind);
   const placedDoorType = useEditorStore((state) => state.placedDoorType);
@@ -84,7 +87,7 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
                   aria-label={def.label}
                   onClick={() => useEditorStore.getState().setPlacedFurnitureKind(kind)}
                 >
-                  <ToolIcon tool="furniture" size={28} />
+                  <FurnitureIcon kind={kind} size={28} />
                 </button>
               );
             })}
@@ -137,24 +140,69 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
             </button>
           </div>
         </>
+      ) : activeTab === 'annotate' ? (
+        <>
+          <h2>Annotations</h2>
+          <div className="library-grid">
+            <button
+              type="button"
+              className="library-tile-btn"
+              aria-pressed={activeTool === 'text'}
+              title="Text Label"
+              aria-label="Text Label"
+              onClick={() => useEditorStore.getState().setTool('text')}
+              style={{ flexDirection: 'column', gap: '6px' }}
+            >
+              <ToolIcon tool="text" size={28} />
+              <span className="library-tile-label">Text Label</span>
+            </button>
+            <button
+              type="button"
+              className="library-tile-btn"
+              aria-pressed={activeTool === 'measure'}
+              title="Measure"
+              aria-label="Measure"
+              onClick={() => useEditorStore.getState().setTool('measure')}
+              style={{ flexDirection: 'column', gap: '6px' }}
+            >
+              <ToolIcon tool="measure" size={28} />
+              <span className="library-tile-label">Measure</span>
+            </button>
+          </div>
+        </>
       ) : tools.length > 0 ? (
-        <div className="library-grid">{tools.map((tool) =>
-          <button
-            key={tool.id}
-            type="button"
-            className="library-tile-btn"
-            aria-pressed={activeTool === tool.id}
-            title={tool.label}
-            aria-label={tool.label}
-            onClick={() => useEditorStore.getState().setTool(tool.id)}
-          >
-            <ToolIcon tool={tool.id} size={28} />
-          </button>,
-        )}</div>
+        <>
+          <h2>{activeTab === 'draw' ? 'Drawing Tools' : 'Tools'}</h2>
+          <div className="library-grid">{tools.map((tool) =>
+            <button
+              key={tool.id}
+              type="button"
+              className="library-tile-btn"
+              aria-pressed={activeTool === tool.id}
+              title={tool.label}
+              aria-label={tool.label}
+              onClick={() => useEditorStore.getState().setTool(tool.id)}
+            >
+              <ToolIcon tool={tool.id} size={28} />
+            </button>,
+          )}</div>
+        </>
       ) : null}
-      <div className="button-row"><button type="button" className="btn-secondary" disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>
+      <div className="button-row">
+        <button type="button" className="btn-secondary" disabled={!canUndo} onClick={() => useDrawingStore.getState().undo()}>Undo</button>
         <button type="button" className="btn-secondary" disabled={!canRedo} onClick={() => useDrawingStore.getState().redo()}>Redo</button>
-        <button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().resetView()}>Reset view</button></div>
+        <button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().resetView()}>Reset view</button>
+      </div>
+
+      <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
+        Unit: 
+        <select value={displayUnit} onChange={(e) => setDisplayUnit(e.target.value as any)}>
+          <option value="inches">Inches</option>
+          <option value="feet">Feet</option>
+          <option value="meters">Meters</option>
+          <option value="millimeters">Millimeters</option>
+        </select>
+      </label>
       <p>Zoom: {Math.round(scale / BASE_PIXELS_PER_MM * 100)}%</p>
       <p className="snap-status" role="status">Snapping: {snapStatus ?? 'Grid and object anchors'}. Hold Alt for free placement.</p>
     </section>}
@@ -162,5 +210,12 @@ export function Sidebar({ recoveryStatus, activeTab }: { recoveryStatus: string;
     {activeTab === 'view' && <DocumentSettings key={`${drawing.name}:${drawing.gridMm}`} document={drawing} />}
     <p role="status">{warning ? 'Automatic recovery paused' : recoveryStatus}</p>
     <small>Local-only drawing. Browser storage and downloaded files are not encrypted by this app. Use your own trusted computer.</small>
+    <div className="button-row" style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+      <button type="button" className="btn-secondary" style={{ color: '#dc2626', borderColor: '#fca5a5', width: '100%' }} onClick={() => {
+        if (window.confirm("Are you sure you want to clear the entire canvas?")) {
+          useDrawingStore.getState().clearCanvas();
+        }
+      }}>Clear Canvas</button>
+    </div>
   </aside>;
 }

@@ -125,8 +125,8 @@ export function FurnitureArtwork({ shape, selected, scale }: Props) {
       return <>
         <Rect width={width} height={height} stroke={stroke} strokeWidth={strokeWidth} fill={fill} />
         {/* Traditional blueprint diagonal 'X' through base cabinet */}
-        <Line points={[0, 0, width, bodyH]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.65} listening={false} />
-        <Line points={[0, bodyH, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} dash={[4 / scale, 4 / scale]} opacity={0.65} listening={false} />
+        <Line points={[0, 0, width, height]} stroke={subStroke} strokeWidth={subStrokeWidth} opacity={0.65} listening={false} />
+        <Line points={[0, height, width, 0]} stroke={subStroke} strokeWidth={subStrokeWidth} opacity={0.65} listening={false} />
         {/* Countertop front overhang line */}
         <Line points={[0, bodyH, width, bodyH]} stroke={stroke} strokeWidth={subStrokeWidth} listening={false} />
         {/* Center split and door pulls */}

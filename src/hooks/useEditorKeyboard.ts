@@ -13,9 +13,8 @@ export function useEditorKeyboard() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) drawing.redo(); else drawing.undo();
-      } else if (editor.selectedId && (event.key === 'Delete' || event.key === 'Backspace')) {
-        event.preventDefault();
-        drawing.deleteShape(editor.selectedId);
+      } else if (editor.selectedIds.length > 0 && (event.key === 'Delete' || event.key === 'Backspace')) {
+        editor.selectedIds.forEach(id => drawing.deleteShape(id));
         editor.select(null);
       } else if (event.key === 'Escape') {
         editor.select(null);

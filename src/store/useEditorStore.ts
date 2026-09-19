@@ -14,7 +14,7 @@ export interface WallDefaults { wallType: WallType; wallThicknessMm: number }
 export const BASE_PIXELS_PER_MM = 96 / 25.4 / 25;
 interface EditorState {
   activeTool: ActiveTool;
-  selectedId: string | null;
+  selectedIds: string[];
   editingId: string | null;
   scale: number;
   position: Point;
@@ -26,7 +26,7 @@ interface EditorState {
   placedDoorType: DoorType;
   placedWindowType: WindowType;
   setTool: (tool: ActiveTool) => void;
-  select: (id: string | null) => void;
+  select: (id: string | null, multi?: boolean) => void;
   editText: (id: string | null) => void;
   setViewport: (position: Point, scale: number) => void;
   reportError: (error: unknown) => void;
@@ -37,17 +37,26 @@ interface EditorState {
   setPlacedDoorType: (doorType: DoorType) => void;
   setPlacedWindowType: (windowType: WindowType) => void;
   resetView: () => void;
+  displayUnit: 'inches' | 'feet' | 'millimeters' | 'meters';
+  setDisplayUnit: (unit: 'inches' | 'feet' | 'millimeters' | 'meters') => void;
 }
 export const useEditorStore = create<EditorState>((set) => ({
-  activeTool: 'select', selectedId: null, editingId: null,
+  activeTool: 'select', selectedIds: [], editingId: null,
   scale: BASE_PIXELS_PER_MM, position: { x: 40, y: 40 }, error: null, snapStatus: null,
   wallDefaults: { wallType: DEFAULT_WALL_TYPE, wallThicknessMm: WALL_DEFINITIONS[DEFAULT_WALL_TYPE].defaultThicknessMm },
   alignmentGuides: [],
   placedFurnitureKind: DEFAULT_FURNITURE_KIND,
   placedDoorType: DEFAULT_DOOR_TYPE,
   placedWindowType: DEFAULT_WINDOW_TYPE,
-  setTool: (activeTool) => set({ activeTool, alignmentGuides: [] }),
-  select: (selectedId) => set({ selectedId, alignmentGuides: [] }),
+  setTool: (activeTool) => set({ activeTool, alignmentGuides: [], selectedIds: [] }),
+  select: (id, multi) => set((state) => {
+    if (!id) return { selectedIds: [], alignmentGuides: [] };
+    if (multi) {
+      const selectedIds = state.selectedIds.includes(id) ? state.selectedIds.filter(s => s !== id) : [...state.selectedIds, id];
+      return { selectedIds, alignmentGuides: [] };
+    }
+    return { selectedIds: [id], alignmentGuides: [] };
+  }),
   editText: (editingId) => set({ editingId }),
   setViewport: (position, scale) => set({ position, scale }),
   reportError: (error) => set({ error: error === null ? null : error instanceof Error ? error.message : 'The operation could not be completed.' }),
@@ -57,5 +66,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setPlacedFurnitureKind: (placedFurnitureKind) => set({ placedFurnitureKind, activeTool: 'furniture' }),
   setPlacedDoorType: (placedDoorType) => set({ placedDoorType, activeTool: 'door' }),
   setPlacedWindowType: (placedWindowType) => set({ placedWindowType, activeTool: 'window' }),
-  resetView: () => set({ activeTool: 'select', selectedId: null, editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [] }),
+  resetView: () => set({ activeTool: 'select', selectedIds: [], editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [] }),
+  displayUnit: 'inches',
+  setDisplayUnit: (displayUnit) => set({ displayUnit }),
 }));

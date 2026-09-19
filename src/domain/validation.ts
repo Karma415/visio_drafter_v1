@@ -1,4 +1,4 @@
-import type { DrawingDocument, Shape, ShapePoint } from './document';
+import type { DrawingDocument, Shape } from './document';
 import { MAX_DISTANCE_MM, MAX_POINTS_PER_SHAPE, MAX_SHAPES, MAX_TEXT_LENGTH, MIN_SIZE_MM } from './document';
 import { isWallType } from './walls';
 import { isFurnitureKind } from './furniture';
@@ -18,15 +18,15 @@ function string(value: unknown, maximum: number): string {
   if (typeof value !== 'string' || value.length > maximum) throw new Error('Invalid or oversized text field.');
   return value;
 }
-function points(value: unknown, type: Shape['type']): ShapePoint[] | undefined {
+function points(value: unknown, type: Shape['type']): number[] | undefined {
   const needsPoints = type === 'line' || type === 'polyline' || type === 'polygon' || type === 'wall' || type === 'measurement';
   if (value === undefined && !needsPoints) return undefined;
-  if (!Array.isArray(value) || value.length > MAX_POINTS_PER_SHAPE) throw new Error('Invalid point list.');
-  const minimum = type === 'polygon' ? 3 : type === 'line' || type === 'polyline' || type === 'wall' || type === 'measurement' ? 2 : 0;
+  if (!Array.isArray(value) || value.length > MAX_POINTS_PER_SHAPE * 2) throw new Error('Invalid point list.');
+  const minimum = type === 'polygon' ? 6 : type === 'line' || type === 'polyline' || type === 'wall' || type === 'measurement' ? 4 : 0;
   if (value.length < minimum) throw new Error('This shape needs more points.');
-  return value.map((point) => {
-    const item = record(point);
-    return { x: finite(item.x, -MAX_DISTANCE_MM, MAX_DISTANCE_MM), y: finite(item.y, -MAX_DISTANCE_MM, MAX_DISTANCE_MM) };
+  return value.map((num) => {
+    if (typeof num !== 'number') throw new Error('Points must be numbers');
+    return finite(num, -MAX_DISTANCE_MM, MAX_DISTANCE_MM);
   });
 }
 
@@ -36,8 +36,8 @@ export function validateShape(value: unknown): Shape {
   const type = item.type as Shape['type'];
   const id = string(item.id, 100);
   if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error('Invalid shape ID.');
-  const fill = string(item.fill, 9);
-  if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(fill)) throw new Error('Use a hexadecimal shape color.');
+  const fill = string(item.fill, 15);
+  if (fill !== 'transparent' && !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(fill)) throw new Error('Use a hexadecimal shape color or "transparent".');
   const wall = type === 'wall'
     ? (() => {
       if (!isWallType(item.wallType)) throw new Error('Unsupported wall type.');
@@ -71,6 +71,7 @@ export function validateShape(value: unknown): Shape {
     width: finite(item.width, MIN_SIZE_MM, MAX_DISTANCE_MM),
     height: finite(item.height, MIN_SIZE_MM, MAX_DISTANCE_MM),
     ...(item.text === undefined ? {} : { text: string(item.text, MAX_TEXT_LENGTH) }),
+    ...(item.fontSize === undefined ? {} : { fontSize: finite(item.fontSize, 1, 10000) }),
     ...(item.rotation === undefined ? {} : { rotation: finite(item.rotation, -36000, 36000) }),
     ...(item.startAngle === undefined ? {} : { startAngle: finite(item.startAngle, -36000, 36000) }),
     ...(item.endAngle === undefined ? {} : { endAngle: finite(item.endAngle, -36000, 36000) }),
@@ -79,6 +80,8 @@ export function validateShape(value: unknown): Shape {
     ...door,
     ...windowOpening,
     ...(points(item.points, type) ? { points: points(item.points, type) } : {}),
+    ...(item.stroke !== undefined ? { stroke: string(item.stroke, 15) } : {}),
+    ...(item.strokeWidth !== undefined ? { strokeWidth: finite(item.strokeWidth, 0, 100) } : {}),
   };
 }
 
