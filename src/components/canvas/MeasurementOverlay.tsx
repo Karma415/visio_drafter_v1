@@ -1,23 +1,25 @@
 import { Circle, Line, Text } from 'react-konva';
 import type { ShapePoint } from '../../domain/document';
 import { distanceBetween } from '../../domain/geometry';
-import { formatMetric, formatNumber, mmToInches } from '../../domain/units';
+import { formatMmToUnit } from '../../utils/units';
+import { useEditorStore } from '../../store/useEditorStore';
 
 interface Props {
   start: ShapePoint;
   end: ShapePoint;
   scale: number;
-  unit: 'mm' | 'cm';
   preview: boolean;
 }
 
 /** Preview shown only while the user is choosing the second endpoint. */
-export function MeasurementOverlay({ start, end, scale, unit, preview }: Props) {
+export function MeasurementOverlay({ start, end, scale, preview }: Props) {
+  const measurementUnit = useEditorStore((state) => state.measurementUnit);
+  const drawingScale = useEditorStore((state) => state.drawingScale);
   const length = distanceBetween(start, end);
   const midX = (start.x + end.x) / 2;
   const midY = (start.y + end.y) / 2;
   const fontSize = 16 / scale;
-  const label = `${formatMetric(length, unit)} · ${formatNumber(mmToInches(length))} in`;
+  const label = `${formatMmToUnit(length, measurementUnit, drawingScale)} ${measurementUnit}`;
   return <>
     <Line points={[start.x, start.y, end.x, end.y]} stroke="#dc2626" strokeWidth={2 / scale}
       dash={preview ? [8 / scale, 5 / scale] : undefined} lineCap="butt" listening={false} />

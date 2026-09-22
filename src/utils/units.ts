@@ -1,6 +1,6 @@
-export type DisplayUnit = 'inches' | 'feet' | 'millimeters' | 'meters';
+export type MeasurementUnit = 'in' | 'ft' | 'mm' | 'cm' | 'm';
 
-export function parseInputToMm(input: string, currentUnit: DisplayUnit, fallbackCurrentMm: number): number {
+export function parseInputToMm(input: string, currentUnit: MeasurementUnit, fallbackCurrentMm: number, drawingScale: number = 1): number {
   if (!input || input.trim() === '') return fallbackCurrentMm;
   
   const text = input.toLowerCase().trim();
@@ -22,43 +22,47 @@ export function parseInputToMm(input: string, currentUnit: DisplayUnit, fallback
   }
 
   if (hasImperialUnit) {
-    return totalInches * 25.4;
+    return (totalInches * 25.4) / drawingScale;
   }
 
   const mMatch = text.match(/([\d.]+)\s*(?:m|meters?)$/);
-  if (mMatch) return parseFloat(mMatch[1]) * 1000;
+  if (mMatch) return (parseFloat(mMatch[1]) * 1000) / drawingScale;
 
   const cmMatch = text.match(/([\d.]+)\s*(?:cm|centimeters?)$/);
-  if (cmMatch) return parseFloat(cmMatch[1]) * 10;
+  if (cmMatch) return (parseFloat(cmMatch[1]) * 10) / drawingScale;
 
   const mmMatch = text.match(/([\d.]+)\s*(?:mm|millimeters?)$/);
-  if (mmMatch) return parseFloat(mmMatch[1]);
+  if (mmMatch) return parseFloat(mmMatch[1]) / drawingScale;
 
   // If no unit is specified, treat it as the current global display unit
   const val = parseFloat(text);
   if (isNaN(val)) return fallbackCurrentMm;
 
+  let result = val;
   switch (currentUnit) {
-    case 'inches': return val * 25.4;
-    case 'feet': return val * 304.8;
-    case 'meters': return val * 1000;
-    case 'millimeters': return val;
-    default: return val;
+    case 'in': result = val * 25.4; break;
+    case 'ft': result = val * 304.8; break;
+    case 'm': result = val * 1000; break;
+    case 'cm': result = val * 10; break;
+    case 'mm': result = val; break;
   }
+  return result / drawingScale;
 }
 
-export function formatMmToUnit(mm: number, unit: DisplayUnit): string {
+export function formatMmToUnit(mm: number, unit: MeasurementUnit, drawingScale: number = 1): string {
   // Try to avoid excessive decimals if it's an exact whole number
   const round = (num: number) => {
     const str = num.toFixed(2);
     return str.endsWith('.00') ? str.slice(0, -3) : str;
   };
 
+  const scaled = mm * drawingScale;
   switch (unit) {
-    case 'inches': return round(mm / 25.4);
-    case 'feet': return round(mm / 304.8);
-    case 'meters': return round(mm / 1000);
-    case 'millimeters': return Math.round(mm).toString();
-    default: return Math.round(mm).toString();
+    case 'in': return round(scaled / 25.4);
+    case 'ft': return round(scaled / 304.8);
+    case 'm': return round(scaled / 1000);
+    case 'cm': return round(scaled / 10);
+    case 'mm': return Math.round(scaled).toString();
+    default: return Math.round(scaled).toString();
   }
 }

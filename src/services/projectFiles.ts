@@ -2,6 +2,7 @@ import type Konva from 'konva';
 import { useDrawingStore } from '../store/useDrawingStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { validateDocument } from '../domain/validation';
+import { jsPDF } from 'jspdf';
 
 let konvaStage: Konva.Stage | null = null;
 
@@ -70,6 +71,49 @@ export function exportImage(): void {
     window.document.body.appendChild(link);
     link.click();
     link.remove();
+  } catch (err) {
+    useEditorStore.getState().reportError(err);
+  }
+}
+
+
+export async function exportPdf(): Promise<void> {
+  try {
+    if (!konvaStage) throw new Error('Canvas stage is not available for export.');
+    
+    const paperSize = useEditorStore.getState().paperSize;
+    const drawingScale = useEditorStore.getState().drawingScale;
+    const sizes = {
+      Letter: { w: 11, h: 8.5 },
+      Tabloid: { w: 17, h: 11 },
+      Arch_C: { w: 24, h: 18 },
+      Arch_D: { w: 36, h: 24 }
+    };
+    const size = sizes[paperSize] || sizes.Arch_D;
+    
+    // Konva renders at physical mm. Paper size in mm = size * 25.4 * drawingScale.
+    const inchesToMm = 25.4;
+    const paperRealWidthMm = size.w * inchesToMm * drawingScale;
+    const paperRealHeightMm = size.h * inchesToMm * drawingScale;
+    
+    // We want a high-res crop of just the paper region from (0,0) to paper width/height
+    const dataUrl = konvaStage.toDataURL({
+      pixelRatio: 3, // High-res
+      x: 0,
+      y: 0,
+      width: paperRealWidthMm,
+      height: paperRealHeightMm
+    });
+    
+    // Create PDF in landscape
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'in',
+      format: [size.w, size.h]
+    });
+    
+    pdf.addImage(dataUrl, 'PNG', 0, 0, size.w, size.h);
+    pdf.save('floorplan.pdf');
   } catch (err) {
     useEditorStore.getState().reportError(err);
   }

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Group, Line, Text } from 'react-konva';
 import { calculateProximityGuides, proximityBounds } from '../../domain/geometry';
-import { useDrawingStore } from '../../store/useDrawingStore';
+import { useDrawingStore, getActivePage } from '../../store/useDrawingStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { formatMmToUnit } from '../../utils/units';
 
@@ -13,14 +13,15 @@ export function ProximityGuides() {
   const dragged = useEditorStore(state => state.proximityShape);
   const selectedIds = useEditorStore(state => state.selectedIds);
   const scale = useEditorStore(state => state.scale);
-  const unit = useEditorStore(state => state.displayUnit);
-  const shapes = useDrawingStore(state => state.document.shapes);
+  const unit = useEditorStore(state => state.measurementUnit);
+  const drawingScale = useEditorStore(state => state.drawingScale);
+  const shapes = useDrawingStore(state => getActivePage(state.document).shapes);
   const guides = useMemo(() => visible && dragged && shapes.some(shape => shape.id === dragged.id)
     ? calculateProximityGuides(proximityBounds(dragged), shapes.filter(shape => !selectedIds.includes(shape.id)), dragged.id) : [], [visible, dragged, shapes, selectedIds]);
 
   return <Group listening={false} name="proximity-guides">
     {guides.map(guide => {
-      const label = `${formatMmToUnit(guide.distanceMm, unit)} ${suffix[unit]}`;
+      const label = `${formatMmToUnit(guide.distanceMm, unit, drawingScale)} ${suffix[unit]}`;
       const labelWidth = (label.length * 8 + 16) / scale;
       return <Group key={guide.direction}>
         <Line points={[guide.start.x, guide.start.y, guide.end.x, guide.end.y]}

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { saveProject, loadProjectFile, exportImage } from '../../services/projectFiles';
+import { saveProject, loadProjectFile, exportImage, exportPdf } from '../../services/projectFiles';
 import { useEditorStore } from '../../store/useEditorStore';
 
 export function FileControls() {
@@ -40,6 +40,14 @@ export function FileControls() {
           style={{ width: '100%' }}
         >
           {loading ? 'Reading…' : 'Load Project'}
+        </button>
+                <button
+          type="button"
+          className="btn-secondary"
+          onClick={exportPdf}
+          style={{ width: '100%', borderColor: '#fca5a5', color: '#b91c1c' }}
+        >
+          Export High-Res PDF
         </button>
         <button
           type="button"

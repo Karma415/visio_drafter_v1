@@ -8,7 +8,7 @@ import type { Shape, ShapePoint } from '../../domain/document';
 import { WALL_DEFINITIONS } from '../../domain/walls';
 import { FURNITURE_DEFINITIONS } from '../../domain/furniture';
 import { OPENING_DEFINITIONS } from '../../domain/doors';
-import { useDrawingStore } from '../../store/useDrawingStore';
+import { useDrawingStore, getActivePage } from '../../store/useDrawingStore';
 import { BASE_PIXELS_PER_MM, useEditorStore } from '../../store/useEditorStore';
 import { DrawingGrid } from './DrawingGrid';
 import { ShapeView } from './ShapeView';
@@ -25,6 +25,93 @@ function shapeLayerOrder(shape: Shape): number {
   return 0;
 }
 
+
+
+function GridBackground({ scale }: { scale: number }) {
+  const document = useDrawingStore(state => state.document);
+  const drawingScale = useEditorStore(state => state.drawingScale);
+  const gridMm = document.gridMm * drawingScale; // Adjust spacing based on scale
+  const paperSize = useEditorStore(state => state.paperSize);
+  
+  const sizes = {
+    Letter: { w: 11, h: 8.5 },
+    Tabloid: { w: 17, h: 11 },
+    Arch_C: { w: 24, h: 18 },
+    Arch_D: { w: 36, h: 24 }
+  };
+  const size = sizes[paperSize] || sizes.Arch_D;
+  const inchesToMm = 25.4;
+  const paperRealWidthMm = size.w * inchesToMm * drawingScale;
+  const paperRealHeightMm = size.h * inchesToMm * drawingScale;
+
+  // Don't render too many lines if extremely zoomed out or huge grid
+  if (gridMm < 10 / scale) return null;
+
+  const lines = [];
+  for (let x = 0; x <= paperRealWidthMm; x += gridMm) {
+    lines.push(<Line key={`v${x}`} points={[x, 0, x, paperRealHeightMm]} stroke="#e2e8f0" strokeWidth={1 / scale} listening={false} />);
+  }
+  for (let y = 0; y <= paperRealHeightMm; y += gridMm) {
+    lines.push(<Line key={`h${y}`} points={[0, y, paperRealWidthMm, y]} stroke="#e2e8f0" strokeWidth={1 / scale} listening={false} />);
+  }
+
+  return <Group listening={false}>{lines}</Group>;
+}
+
+function PaperBoundary({ scale }: { scale: number }) {
+  const paperSize = useEditorStore(state => state.paperSize);
+  const drawingScale = useEditorStore(state => state.drawingScale);
+  const document = useDrawingStore(state => state.document);
+  const activePageId = useEditorStore(state => state.activePageId);
+  const activePage = document.pages.find(p => p.id === activePageId) || document.pages[0];
+
+  // Paper dimensions in inches
+  const sizes = {
+    Letter: { w: 11, h: 8.5 },
+    Tabloid: { w: 17, h: 11 },
+    Arch_C: { w: 24, h: 18 },
+    Arch_D: { w: 36, h: 24 }
+  };
+  const inchesToMm = 25.4;
+  
+  // Real world mm represented by the paper
+  // If drawingScale is 50 (1 inch paper = 50 inches real world? No, 1 drawing unit = drawingScale real units)
+  // Our system is: 1 pixel on screen = `drawingScale` mm in real world when zoom is 100%.
+  // Wait, standard scale: e.g. 1/4" = 1'0". 
+  // Let's just define the paper size in internal canvas units.
+  // We use `scale` for zoom. The canvas is drawn at real-world mm.
+  // Actually, the paper represents the physical page. 
+  // If we print from mm to paper, the scale is exactly `drawingScale`.
+  // So paper width in real-world mm = paper width (inches) * inchesToMm * drawingScale.
+  const size = sizes[paperSize] || sizes.Arch_D;
+  const paperRealWidthMm = size.w * inchesToMm * drawingScale;
+  const paperRealHeightMm = size.h * inchesToMm * drawingScale;
+
+  // Render a subtle rect bounding the paper, anchored at (0,0) or center? Let's anchor at (0,0).
+  return (
+    <Group x={0} y={0} listening={false}>
+      {/* Paper Drop Shadow */}
+      <Rect x={100} y={100} width={paperRealWidthMm} height={paperRealHeightMm} fill="#0000001a" />
+      {/* Paper Background */}
+      <GridBackground scale={scale} />
+      <Rect width={paperRealWidthMm} height={paperRealHeightMm} fill="#ffffff" stroke="#cbd5e1" strokeWidth={2 / scale} />
+      
+      {/* Title Block (Bottom Right) */}
+      <Group x={paperRealWidthMm - (250 * drawingScale)} y={paperRealHeightMm - (100 * drawingScale)}>
+        <Rect width={250 * drawingScale} height={100 * drawingScale} stroke="#0f172a" strokeWidth={2 / scale} fill="#ffffff" />
+        <Line points={[0, 25 * drawingScale, 250 * drawingScale, 25 * drawingScale]} stroke="#0f172a" strokeWidth={1 / scale} />
+        <Line points={[0, 50 * drawingScale, 250 * drawingScale, 50 * drawingScale]} stroke="#0f172a" strokeWidth={1 / scale} />
+        <Line points={[0, 75 * drawingScale, 250 * drawingScale, 75 * drawingScale]} stroke="#0f172a" strokeWidth={1 / scale} />
+        
+        <Text x={5 * drawingScale} y={5 * drawingScale} text={`PROJECT: ${document.name}`} fontSize={12 * drawingScale} fontStyle="bold" fill="#0f172a" />
+        <Text x={5 * drawingScale} y={30 * drawingScale} text={`CLIENT: ${document.clientName || 'TBD'}`} fontSize={10 * drawingScale} fill="#0f172a" />
+        <Text x={5 * drawingScale} y={55 * drawingScale} text={`ARCHITECT: ${document.architectName || 'TBD'}`} fontSize={10 * drawingScale} fill="#0f172a" />
+        <Text x={5 * drawingScale} y={80 * drawingScale} text={`SCALE: 1:${drawingScale}   |   PAGE: ${activePage?.name || '1'}`} fontSize={10 * drawingScale} fill="#0f172a" />
+      </Group>
+    </Group>
+  );
+}
+
 export function DrawingCanvas() {
   const container = useRef<HTMLDivElement | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
@@ -33,6 +120,8 @@ export function DrawingCanvas() {
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [draft, setDraft] = useState<{ type: 'line' | 'polyline' | 'polygon' | 'wall'; points: ShapePoint[]; pointer: ShapePoint | null } | null>(null);
   const [dragDraft, setDragDraft] = useState<{ start: ShapePoint; current: ShapePoint } | null>(null);
+  const [lasso, setLasso] = useState<{start: ShapePoint, current: ShapePoint} | null>(null);
+  const [eraserActive, setEraserActive] = useState(false);
   const [measurement, setMeasurement] = useState<{ start: ShapePoint; pointer: ShapePoint | null } | null>(null);
   const document = useDrawingStore((state) => state.document);
   const activeTool = useEditorStore((state) => state.activeTool);
@@ -41,7 +130,7 @@ export function DrawingCanvas() {
   const position = useEditorStore((state) => state.position);
   const wallDefaults = useEditorStore((state) => state.wallDefaults);
   const alignmentGuides = useEditorStore((state) => state.alignmentGuides);
-  const selectedShape = document.shapes.find((shape) => shape.id === selectedIds[0]);
+  const selectedShape = getActivePage(document).shapes.find((shape) => shape.id === selectedIds[0]);
   const register = useCallback((id: string, node: ShapeNode | null) => {
     if (!node) {
       nodes.current.delete(id);
@@ -73,7 +162,7 @@ export function DrawingCanvas() {
       : [];
     transformerRef.current?.nodes(selectedNodes);
     transformerRef.current?.getLayer()?.batchDraw();
-  }, [selectedIds, activeTool, document.shapes]);
+  }, [selectedIds, activeTool, getActivePage(document).shapes]);
 
   const activeDraft = draft?.type === activeTool ? draft : null;
 
@@ -102,7 +191,7 @@ export function DrawingCanvas() {
         fill: type === 'polygon' ? '#93c5fd' : type === 'wall' ? WALL_DEFINITIONS?.[wallDefaults.wallType]?.color || '#334155' : '#1d4ed8',
         ...(type === 'wall' ? wallDefaults : {}),
       });
-      const added = useDrawingStore.getState().document.shapes.at(-1);
+      const added = getActivePage(useDrawingStore.getState().document).shapes.at(-1);
       setDraft(null);
       if (added && type === 'wall') {
         useDrawingStore.getState().mergeWall(added.id);
@@ -153,7 +242,13 @@ export function DrawingCanvas() {
     event.evt.preventDefault();
     const pointer = event.target.getStage()?.getPointerPosition();
     if (!pointer) return;
-    const world = screenToWorld(pointer, position, scale);
+    
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
     const direction = event.evt.ctrlKey ? -event.evt.deltaY : event.evt.deltaY;
     const nextScale = Math.min(BASE_PIXELS_PER_MM * 20, Math.max(BASE_PIXELS_PER_MM / 10, scale * (direction > 0 ? 1 / 1.08 : 1.08)));
     useEditorStore.getState().setViewport({ x: pointer.x - world.x * nextScale, y: pointer.y - world.y * nextScale }, nextScale);
@@ -163,6 +258,88 @@ export function DrawingCanvas() {
     if (!stage || event.target !== stage) return;
     useEditorStore.getState().setViewport(stage.position(), scale);
   }
+  
+  function handlePointerDown(event: KonvaEventObject<PointerEvent>) {
+    const stage = event.target.getStage();
+    if (!stage || event.target !== stage) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
+    const editor = useEditorStore.getState();
+    if (editor.activeTool === 'lasso') {
+      setLasso({ start: world, current: world });
+    } else if (editor.activeTool === 'eraser') {
+      setEraserActive(true);
+      eraseAt(world, editor.eraserSize);
+    }
+  }
+
+  function handlePointerMove(event: KonvaEventObject<PointerEvent>) {
+    const stage = event.target.getStage();
+    if (!stage) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
+    
+    if (lasso) {
+      setLasso({ start: lasso.start, current: world });
+    } else if (eraserActive && activeTool === 'eraser') {
+      const editor = useEditorStore.getState();
+      eraseAt(world, editor.eraserSize);
+    }
+  }
+
+  function handlePointerUp(event: KonvaEventObject<PointerEvent>) {
+    if (lasso) {
+      // Find shapes in bounds
+      const minX = Math.min(lasso.start.x, lasso.current.x);
+      const minY = Math.min(lasso.start.y, lasso.current.y);
+      const maxX = Math.max(lasso.start.x, lasso.current.x);
+      const maxY = Math.max(lasso.start.y, lasso.current.y);
+      const shapes = getActivePage(document).shapes;
+      const ids = shapes.filter(s => {
+        // Simple bounding box intersection
+        const sMinX = s.x;
+        const sMinY = s.y;
+        const sMaxX = s.x + s.width;
+        const sMaxY = s.y + s.height;
+        return sMinX < maxX && sMaxX > minX && sMinY < maxY && sMaxY > minY;
+      }).map(s => s.id);
+      useEditorStore.getState().selectMany(ids);
+      useEditorStore.getState().setTool('select');
+      setLasso(null);
+    }
+    if (eraserActive) setEraserActive(false);
+  }
+
+  function eraseAt(world: ShapePoint, radius: number) {
+    const shapes = getActivePage(useDrawingStore.getState().document).shapes;
+    const toDelete = shapes.filter(s => {
+      // Very simple bounding box hit test with radius
+      const sMinX = s.x;
+      const sMinY = s.y;
+      const sMaxX = s.x + s.width;
+      const sMaxY = s.y + s.height;
+      return world.x + radius > sMinX && world.x - radius < sMaxX && 
+             world.y + radius > sMinY && world.y - radius < sMaxY;
+    });
+    if (toDelete.length > 0) {
+      useDrawingStore.getState().removeShapes(toDelete.map(s => s.id));
+    }
+  }
+
   function click(event: KonvaEventObject<MouseEvent | TouchEvent>) {
     const stage = event.target.getStage();
     if (!stage) return;
@@ -173,7 +350,13 @@ export function DrawingCanvas() {
     }
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
-    const world = screenToWorld(pointer, position, scale);
+    
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
     if (activeTool === 'measure') {
       let target = world;
       if (event.evt.shiftKey && measurement) {
@@ -183,7 +366,7 @@ export function DrawingCanvas() {
       }
       const snapResult = event.evt.altKey
         ? { point: target, kind: 'free' as const }
-        : snapToWallFace(target, document.shapes, document.gridMm, 16 / scale);
+        : snapToWallFace(target, getActivePage(document).shapes, document.gridMm, 16 / scale);
       
       let finalPoint = snapResult.point;
       if (event.evt.shiftKey && measurement) {
@@ -198,7 +381,7 @@ export function DrawingCanvas() {
         try {
           const normalized = normalizePoints([measurement.start, finalPoint]);
           useDrawingStore.getState().addShape({ type: 'measurement', ...normalized.bounds, points: normalized.points.flatMap(p => [p.x, p.y]), fill: '#dc2626' });
-          const added = useDrawingStore.getState().document.shapes.at(-1);
+          const added = getActivePage(useDrawingStore.getState().document).shapes.at(-1);
           setMeasurement(null);
           editor.setTool('select');
           editor.select(added?.id ?? null);
@@ -229,9 +412,9 @@ export function DrawingCanvas() {
         ? { point: world, kind: 'free' as const }
         : activeTool === 'wall'
           ? activeDraft?.type === 'wall' && activeDraft.points[0]
-            ? snapWallEndpoint(world, activeDraft.points[0], document.shapes, document.gridMm, 16 / scale)
-            : snapToWallPoint(world, document.shapes, document.gridMm, 16 / scale)
-          : snapToDrawingPointWithKind(world, document.shapes, document.gridMm, 16 / scale);
+            ? snapWallEndpoint(world, activeDraft.points[0], getActivePage(document).shapes, document.gridMm, 16 / scale)
+            : snapToWallPoint(world, getActivePage(document).shapes, document.gridMm, 16 / scale)
+          : snapToDrawingPointWithKind(world, getActivePage(document).shapes, document.gridMm, 16 / scale);
       point = snapResult.point;
       snapKind = snapResult.kind;
     }
@@ -288,7 +471,7 @@ export function DrawingCanvas() {
         const openingSnap = snapOpeningOrigin(
           { x: point.x, y: point.y },
           { id: 'temp', type: activeTool, x: point.x, y: point.y, width, height, fill },
-          document.shapes,
+          getActivePage(document).shapes,
           document.gridMm,
           16 / scale,
         );
@@ -316,7 +499,7 @@ export function DrawingCanvas() {
 
       useDrawingStore.getState().addShape(payload);
       editor.setTool('select');
-      const added = useDrawingStore.getState().document.shapes.at(-1);
+      const added = getActivePage(useDrawingStore.getState().document).shapes.at(-1);
       editor.select(added?.id ?? null);
       editor.setSnapStatus(snapStatus(finalKind));
     } catch (error) { editor.reportError(error); }
@@ -336,7 +519,7 @@ export function DrawingCanvas() {
     } finally {
       for (const [id] of transformStart.current) {
         const node = nodes.current.get(id);
-        const shape = useDrawingStore.getState().document.shapes.find(item => item.id === id);
+        const shape = getActivePage(useDrawingStore.getState().document).shapes.find(item => item.id === id);
         if (!node || !shape) continue;
         const minimum = Math.min(shape.width, shape.height);
         node.scale(shape.type === 'triangle' || shape.type === 'arc' ? { x: shape.width / minimum, y: shape.height / minimum } : { x: 1, y: 1 });
@@ -350,7 +533,13 @@ export function DrawingCanvas() {
   function pointerMove(event: KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointer = event.target.getStage()?.getPointerPosition();
     if (!pointer) return;
-    const world = screenToWorld(pointer, position, scale);
+    
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
     if (activeTool === 'measure' && measurement) {
       let target = world;
       if (event.evt.shiftKey) {
@@ -360,7 +549,7 @@ export function DrawingCanvas() {
       }
       let point = event.evt.altKey
         ? target
-        : snapToWallFace(target, document.shapes, document.gridMm, 16 / scale).point;
+        : snapToWallFace(target, getActivePage(document).shapes, document.gridMm, 16 / scale).point;
 
       if (event.evt.shiftKey) {
         point = Math.abs(world.x - measurement.start.x) > Math.abs(world.y - measurement.start.y)
@@ -383,8 +572,8 @@ export function DrawingCanvas() {
       point = event.evt.altKey
         ? world
         : activeDraft.type === 'wall'
-          ? snapWallEndpoint(world, activeDraft.points[0], document.shapes, document.gridMm, 16 / scale).point
-          : snapToDrawingPointWithKind(world, document.shapes, document.gridMm, 16 / scale).point;
+          ? snapWallEndpoint(world, activeDraft.points[0], getActivePage(document).shapes, document.gridMm, 16 / scale).point
+          : snapToDrawingPointWithKind(world, getActivePage(document).shapes, document.gridMm, 16 / scale).point;
     }
 
     if ((activeTool === 'square' || activeTool === 'rectangle') && dragDraft) {
@@ -412,16 +601,22 @@ export function DrawingCanvas() {
     }}>
     <Stage ref={(node) => registerStage(node)} width={size.width} height={size.height} x={position.x} y={position.y}
       scaleX={scale} scaleY={scale} draggable={activeTool === 'select' || activeTool === 'move'}
-      onWheel={wheel} onClick={click} onTap={click}
+      onWheel={wheel} onClick={click} onTap={click} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}
       onMouseMove={pointerMove} onTouchMove={pointerMove} onDragMove={pan} onDragEnd={pan}
       onMouseDown={(event) => {
         if (activeTool === 'text') {
           const pointer = event.target.getStage()?.getPointerPosition();
           if (pointer) {
-            const world = screenToWorld(pointer, position, scale);
+            
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
             const snapResult = event.evt.altKey
               ? { point: world }
-              : snapToDrawingPointWithKind(world, document.shapes, document.gridMm, 16 / scale);
+              : snapToDrawingPointWithKind(world, getActivePage(document).shapes, document.gridMm, 16 / scale);
             const placePoint = snapResult.point;
             useDrawingStore.getState().addShape({
               type: 'text',
@@ -433,7 +628,7 @@ export function DrawingCanvas() {
               text: 'Label',
               fontSize: 120,
             });
-            const added = useDrawingStore.getState().document.shapes.at(-1);
+            const added = getActivePage(useDrawingStore.getState().document).shapes.at(-1);
             useEditorStore.getState().setTool('select');
             useEditorStore.getState().select(added?.id ?? null);
           }
@@ -442,7 +637,13 @@ export function DrawingCanvas() {
         if (activeTool === 'square' || activeTool === 'rectangle') {
           const pointer = event.target.getStage()?.getPointerPosition();
           if (pointer) {
-             const world = screenToWorld(pointer, position, scale);
+             
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
              setDragDraft({ start: world, current: world });
           }
         }
@@ -451,8 +652,14 @@ export function DrawingCanvas() {
         if (activeTool === 'text') {
           const pointer = event.target.getStage()?.getPointerPosition();
           if (pointer) {
-            const world = screenToWorld(pointer, position, scale);
-            const snapResult = snapToDrawingPointWithKind(world, document.shapes, document.gridMm, 16 / scale);
+            
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
+            const snapResult = snapToDrawingPointWithKind(world, getActivePage(document).shapes, document.gridMm, 16 / scale);
             const placePoint = snapResult.point;
             useDrawingStore.getState().addShape({
               type: 'text',
@@ -464,7 +671,7 @@ export function DrawingCanvas() {
               text: 'Label',
               fontSize: 120,
             });
-            const added = useDrawingStore.getState().document.shapes.at(-1);
+            const added = getActivePage(useDrawingStore.getState().document).shapes.at(-1);
             useEditorStore.getState().setTool('select');
             useEditorStore.getState().select(added?.id ?? null);
           }
@@ -473,7 +680,13 @@ export function DrawingCanvas() {
         if (activeTool === 'square' || activeTool === 'rectangle') {
           const pointer = event.target.getStage()?.getPointerPosition();
           if (pointer) {
-             const world = screenToWorld(pointer, position, scale);
+             
+    let world = screenToWorld(pointer, position, scale);
+    if (useEditorStore.getState().isGridSnapEnabled && !event.evt.altKey) {
+      const grid = useDrawingStore.getState().document.gridMm * useEditorStore.getState().drawingScale;
+      world = { x: Math.round(world.x / grid) * grid, y: Math.round(world.y / grid) * grid };
+    }
+
              setDragDraft({ start: world, current: world });
           }
         }
@@ -510,14 +723,38 @@ export function DrawingCanvas() {
       }}>
       <DrawingGrid {...size} position={position} scale={scale} gridMm={document.gridMm} />
       <Layer>
-        {[...document.shapes]
-          .sort((a, b) => shapeLayerOrder(a) - shapeLayerOrder(b))
-          .map((shape) => <ShapeView key={shape.id} shape={shape} gridMm={document.gridMm} unit={document.displayUnit}
-            selectable={activeTool === 'select' || activeTool === 'move'} selected={(activeTool === 'select' || activeTool === 'move') && selectedIds.includes(shape.id)}
-            scale={scale} register={register} />)}
+        <PaperBoundary scale={scale} />
+        {(() => {
+          const layerIndexMap = new Map(getActivePage(document).layers.map((l, i) => [l.id, i]));
+          const visibleShapes = getActivePage(document).shapes.filter(s => {
+            const layer = getActivePage(document).layers.find(l => l.id === s.layerId);
+            return layer ? layer.isVisible : true;
+          });
+          visibleShapes.sort((a, b) => {
+            const indexA = layerIndexMap.get(a.layerId) ?? 0;
+            const indexB = layerIndexMap.get(b.layerId) ?? 0;
+            if (indexA !== indexB) return indexA - indexB;
+            return shapeLayerOrder(a) - shapeLayerOrder(b);
+          });
+          return visibleShapes.map((shape) => {
+            const layer = getActivePage(document).layers.find(l => l.id === shape.layerId);
+            const isLocked = layer ? layer.isLocked : false;
+            const selectable = !isLocked && (activeTool === 'select' || activeTool === 'move');
+            return <ShapeView key={shape.id} shape={shape} gridMm={document.gridMm} unit={document.measurementUnit}
+              selectable={selectable} selected={(activeTool === 'select' || activeTool === 'move') && selectedIds.includes(shape.id)}
+              scale={scale} register={register} />
+          });
+        })()}
         {activeDraft && <Line points={draftPoints} closed={activeDraft.type === 'polygon'} stroke="#475569" strokeWidth={3 / scale} dash={[8 / scale, 8 / scale]} listening={false} />}
+        
+        {lasso && <Rect x={Math.min(lasso.start.x, lasso.current.x)} y={Math.min(lasso.start.y, lasso.current.y)} width={Math.abs(lasso.current.x - lasso.start.x)} height={Math.abs(lasso.current.y - lasso.start.y)} fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" strokeWidth={1/scale} listening={false} />}
+        {activeTool === 'eraser' && (
+          <Layer listening={false}>
+            {/* Draw eraser cursor if we have pointer */}
+          </Layer>
+        )}
         {measurement && measurementEnd && <MeasurementOverlay start={measurement.start} end={measurementEnd}
-          preview={true} scale={scale} unit={document.displayUnit} />}
+          preview={true} scale={scale} />}
         {dragDraft && (
           <Rect
             x={Math.min(dragDraft.start.x, dragDraft.current.x)}
@@ -537,7 +774,7 @@ export function DrawingCanvas() {
           onTransformStart={() => {
             transformStart.current.clear();
             for (const id of selectedIds) {
-              const shape = document.shapes.find(item => item.id === id);
+              const shape = getActivePage(document).shapes.find(item => item.id === id);
               const node = nodes.current.get(id);
               if (shape && node) transformStart.current.set(id, { shape, scaleX: node.scaleX(), scaleY: node.scaleY() });
             }

@@ -1,4 +1,4 @@
-import type { Bounds, Shape, ShapePoint, DrawingDocument } from './document';
+import type { Bounds, Shape, ShapePoint, DrawingDocument, Page } from './document';
 import { getShapePoints, MIN_SIZE_MM } from './document';
 
 export interface Point { x: number; y: number }
@@ -648,13 +648,13 @@ export function snappedBounds(bounds: Bounds, grid: number): Bounds {
 export function visibleGridStep(gridMm: number, pixelsPerMm: number): number {
   return gridMm * 2 ** Math.max(0, Math.ceil(Math.log2(12 / (gridMm * pixelsPerMm))));
 }
-export function mergeMatchingWalls(document: DrawingDocument, targetId: string): DrawingDocument {
-  const target = document.shapes.find(s => s.id === targetId);
-  if (!target || target.type !== 'wall') return document;
+export function mergeMatchingWalls(page: Page, targetId: string): Page {
+  const target = page.shapes.find(s => s.id === targetId);
+  if (!target || target.type !== 'wall') return page;
 
   let currentPoints = getShapePoints(target).map(p => ({ x: target.x + p.x, y: target.y + p.y }));
   let didMerge = false;
-  const remainingShapes = document.shapes.filter(s => s.id !== targetId);
+  const remainingShapes = page.shapes.filter(s => s.id !== targetId);
 
   let canMerge = true;
   while (canMerge) {
@@ -700,7 +700,7 @@ export function mergeMatchingWalls(document: DrawingDocument, targetId: string):
     }
   }
 
-  if (!didMerge) return document;
+  if (!didMerge) return page;
 
   const normalized = normalizePoints(currentPoints);
   const mergedWall: Shape = {
@@ -710,7 +710,7 @@ export function mergeMatchingWalls(document: DrawingDocument, targetId: string):
   };
 
   return {
-    ...document,
+    ...page,
     shapes: [...remainingShapes, mergedWall]
   };
 }

@@ -2,15 +2,15 @@ import type { Shape } from '../../domain/document';
 import { useState } from 'react';
 import { parseInputToMm } from '../../utils/units';
 import { runSelectionCommand } from '../../services/selectionCommands';
-import { useDrawingStore } from '../../store/useDrawingStore';
+import { useDrawingStore, getActivePage } from '../../store/useDrawingStore';
 import { useEditorStore } from '../../store/useEditorStore';
 
 export function SelectionActions({ shape, selectedIds = [] }: { shape: Shape | undefined, selectedIds?: string[] }) {
   const [gap, setGap] = useState('');
-  const unit = useEditorStore(state => state.displayUnit);
+  const unit = useEditorStore(state => state.measurementUnit);
   const perform = (action: () => void) => { try { action(); } catch (error) { useEditorStore.getState().reportError(error); } };
   const drawing = useDrawingStore.getState().document;
-  const allSelectedShapes = selectedIds.map(id => drawing.shapes.find(s => s.id === id)).filter(Boolean) as Shape[];
+  const allSelectedShapes = selectedIds.map(id => getActivePage(drawing)?.shapes?.find(s => s.id === id)).filter(Boolean) as Shape[];
   const allWalls = allSelectedShapes.length > 1 && allSelectedShapes.every(s => s.type === 'wall');
 
   return <section className="selection-actions" aria-label="Selection actions">
@@ -20,7 +20,7 @@ export function SelectionActions({ shape, selectedIds = [] }: { shape: Shape | u
       {shape?.type === 'text' && selectedIds.length === 1 && <button type="button" className="btn-secondary" onClick={() => useEditorStore.getState().editText(shape.id)}>Edit Text</button>}
       {shape?.type === 'wall' && shape.points && shape.points.length > 4 && selectedIds.length === 1 && (
         <button type="button" className="btn-secondary" onClick={() => {
-          useDrawingStore.getState().ungroupShape(shape.id);
+          /* legacy ungroup */
           useEditorStore.getState().select(null);
         }}>Ungroup Wall</button>
       )}
@@ -29,12 +29,30 @@ export function SelectionActions({ shape, selectedIds = [] }: { shape: Shape | u
           useDrawingStore.getState().groupWalls(selectedIds);
         }}>Group Walls</button>
       )}
+      
+      {selectedIds.length > 1 && (
+        <button type="button" className="btn-secondary" onClick={() => {
+          useDrawingStore.getState().groupShapes(selectedIds);
+          useEditorStore.getState().select(null);
+        }}>Group Items</button>
+      )}
+      {shape?.type === 'group' && selectedIds.length === 1 && (
+        <button type="button" className="btn-secondary" onClick={() => {
+          useDrawingStore.getState().ungroupShape(shape.id);
+          useEditorStore.getState().select(null);
+        }}>Ungroup Items</button>
+      )}
       <button type="button" className="btn-destructive" onClick={() => {
         runSelectionCommand('delete');
       }}>Delete selected</button>
     </div>}
+    
+    {selectedIds.length > 0 && <div className="button-row" aria-label="Z-Index Order">
+      <button type="button" className="btn-secondary" onClick={() => perform(() => useDrawingStore.getState().reorderShapes(selectedIds, 'front'))}>Bring to Front</button>
+      <button type="button" className="btn-secondary" onClick={() => perform(() => useDrawingStore.getState().reorderShapes(selectedIds, 'back'))}>Send to Back</button>
+    </div>}
     {selectedIds.length >= 2 && <div className="button-row" aria-label="Align selection">
-      {(['top', 'bottom', 'left', 'right'] as const).map(edge => <button key={edge} type="button" className="btn-secondary"
+      {(['top', 'bottom', 'left', 'right', 'center', 'middle'] as const).map(edge => <button key={edge} type="button" className="btn-secondary"
         onClick={() => perform(() => useDrawingStore.getState().alignSelection(selectedIds, edge))}>Align {edge}</button>)}
     </div>}
     {selectedIds.length >= 3 && <>

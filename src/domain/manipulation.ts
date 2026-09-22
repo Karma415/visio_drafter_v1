@@ -2,19 +2,29 @@ import type { Shape, ShapePoint } from './document';
 import { flatShapePoints, getShapePoints } from './document';
 import { isCenteredShape, normalizePoints, proximityBounds } from './geometry';
 
-export type Alignment = 'top' | 'bottom' | 'left' | 'right';
+export type Alignment = 'top' | 'bottom' | 'left' | 'right' | 'center' | 'middle';
 export type DistributionAxis = 'horizontal' | 'vertical';
 
 export function alignShapes(shapes: Shape[], alignment: Alignment): Shape[] {
   if (shapes.length < 2) return shapes;
-  const axis = alignment === 'left' || alignment === 'right' ? 'x' : 'y';
+  const axis = (alignment === 'left' || alignment === 'right' || alignment === 'center') ? 'x' : 'y';
   const size = axis === 'x' ? 'width' : 'height';
   const trailing = alignment === 'right' || alignment === 'bottom';
+  const middle = alignment === 'center' || alignment === 'middle';
   const edges = shapes.map(shape => {
     const bounds = proximityBounds(shape);
-    return bounds[axis] + (trailing ? bounds[size] : 0);
+    return bounds[axis] + (trailing ? bounds[size] : (middle ? bounds[size] / 2 : 0));
   });
-  const target = trailing ? Math.max(...edges) : Math.min(...edges);
+  
+  let target;
+  if (middle) {
+    const starts = shapes.map(s => proximityBounds(s)[axis]);
+    const ends = shapes.map(s => proximityBounds(s)[axis] + proximityBounds(s)[size]);
+    target = (Math.min(...starts) + Math.max(...ends)) / 2;
+  } else {
+    target = trailing ? Math.max(...edges) : Math.min(...edges);
+  }
+  
   return shapes.map((shape, index) => ({ ...shape, [axis]: shape[axis] + target - edges[index] }));
 }
 

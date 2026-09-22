@@ -10,6 +10,28 @@ export interface Bounds {
   height: number;
 }
 
+export interface Layer {
+  id: string;
+  name: string;
+  clientName?: string;
+  architectName?: string;
+  projectAddress?: string;
+  projectDate?: string;
+  isVisible: boolean;
+  isLocked: boolean;
+}
+
+export interface Page {
+  id: string;
+  name: string;
+  clientName?: string;
+  architectName?: string;
+  projectAddress?: string;
+  projectDate?: string;
+  shapes: Shape[];
+  layers: Layer[];
+}
+
 export type ShapeType =
   | 'rectangle'
   | 'square'
@@ -21,8 +43,13 @@ export type ShapeType =
   | 'polygon'
   | 'arc'
   | 'text'
+  | 'callout'
   | 'wall'
   | 'measurement'
+  | 'spreadsheet'
+  | 'image'
+  | 'group'
+  | 'chart'
   | 'furniture'
   | 'door'
   | 'window';
@@ -48,9 +75,17 @@ export function flatShapePoints(points: ShapePoint[]): number[] {
 export interface Shape extends Bounds {
   id: string;
   type: ShapeType;
+  layerId: string;
   fill: string;
+  fillColor?: string;
+  strokeColor?: string;
   stroke?: string;
   strokeWidth?: number;
+  opacity?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
   text?: string;
   fontSize?: number;
   /** Local points, relative to the shape's top-left bounds, for line-based shapes. */
@@ -70,6 +105,15 @@ export interface Shape extends Bounds {
   windowType?: WindowType;
   swingHinge?: 'left' | 'right';
   swingDirection?: 'inside' | 'outside';
+  /** Spreadsheet widget data */
+  spreadsheetData?: string[][];
+  /** Base64 data URL for custom images */
+  imageUrl?: string;
+  /** Grouped children shapes */
+  groupChildren?: Shape[];
+  /** Chart Widget */
+  chartData?: string;
+  chartType?: 'bar' | 'pie';
 }
 
 export interface DrawingDocument {
@@ -77,10 +121,14 @@ export interface DrawingDocument {
   version: 1;
   units: 'mm';
   name: string;
+  clientName?: string;
+  architectName?: string;
+  projectAddress?: string;
+  projectDate?: string;
   paperScale: 25;
-  displayUnit: 'mm' | 'cm';
+  measurementUnit: 'mm' | 'cm';
   gridMm: number;
-  shapes: Shape[];
+  pages: Page[];
 }
 
 export const MAX_SHAPES = 2000;
@@ -93,6 +141,12 @@ export const MAX_POINTS_PER_SHAPE = 200;
 export function createDocument(): DrawingDocument {
   return {
     format: 'karma-draft', version: 1, units: 'mm', name: 'My apartment',
-    paperScale: 25, displayUnit: 'mm', gridMm: 25.4, shapes: [],
+    paperScale: 25, measurementUnit: 'mm', gridMm: 25.4, 
+    pages: [{
+      id: crypto.randomUUID(),
+      name: 'Page 1',
+      layers: [{ id: 'default', name: 'Layer 1', isVisible: true, isLocked: false }],
+      shapes: [],
+    }],
   };
 }

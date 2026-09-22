@@ -8,7 +8,7 @@ import { DEFAULT_FURNITURE_KIND } from '../domain/furniture';
 import type { DoorType, WindowType } from '../domain/doors';
 import { DEFAULT_DOOR_TYPE, DEFAULT_WINDOW_TYPE } from '../domain/doors';
 
-export type ActiveTool = 'select' | 'move' | 'measure' | ShapeType;
+export type ActiveTool = 'select' | 'move' | 'measure' | 'eraser' | 'lasso' | ShapeType;
 export type SnapStatus = 'Object snap' | 'Wall join snap' | 'Grid snap' | 'Free placement (Alt)' | 'Move only' | null;
 export interface WallDefaults { wallType: WallType; wallThicknessMm: number }
 export const BASE_PIXELS_PER_MM = 96 / 25.4 / 25;
@@ -42,12 +42,24 @@ interface EditorState {
   setPlacedDoorType: (doorType: DoorType) => void;
   setPlacedWindowType: (windowType: WindowType) => void;
   resetView: () => void;
-  displayUnit: 'inches' | 'feet' | 'millimeters' | 'meters';
-  setDisplayUnit: (unit: 'inches' | 'feet' | 'millimeters' | 'meters') => void;
+  measurementUnit: 'in' | 'ft' | 'mm' | 'cm' | 'm';
+  setMeasurementUnit: (unit: 'in' | 'ft' | 'mm' | 'cm' | 'm') => void;
+  drawingScale: number;
+  setDrawingScale: (scale: number) => void;
+  eraserSize: number;
+  setEraserSize: (size: number) => void;
+  activeLayerId: string | null;
+  setActiveLayerId: (id: string | null) => void;
+  activePageId: string | null;
+  setActivePageId: (id: string | null) => void;
 }
 export const useEditorStore = create<EditorState>((set) => ({
   activeTool: 'select', selectedIds: [], editingId: null,
   scale: BASE_PIXELS_PER_MM, position: { x: 40, y: 40 }, error: null, snapStatus: null,
+  isGridSnapEnabled: false,
+  setGridSnapEnabled: (isGridSnapEnabled) => set({ isGridSnapEnabled }),
+  paperSize: 'Arch_D',
+  setPaperSize: (paperSize) => set({ paperSize }),
   wallDefaults: { wallType: DEFAULT_WALL_TYPE, wallThicknessMm: WALL_DEFINITIONS[DEFAULT_WALL_TYPE].defaultThicknessMm },
   alignmentGuides: [],
   showProximityGuides: true,
@@ -77,7 +89,19 @@ export const useEditorStore = create<EditorState>((set) => ({
   setPlacedFurnitureKind: (placedFurnitureKind) => set({ placedFurnitureKind, activeTool: 'furniture' }),
   setPlacedDoorType: (placedDoorType) => set({ placedDoorType, activeTool: 'door' }),
   setPlacedWindowType: (placedWindowType) => set({ placedWindowType, activeTool: 'window' }),
-  resetView: () => set({ activeTool: 'select', selectedIds: [], editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null, alignmentGuides: [], proximityShape: null }),
-  displayUnit: 'inches',
-  setDisplayUnit: (displayUnit) => set({ displayUnit }),
+  resetView: () => set({ activeTool: 'select', selectedIds: [], editingId: null, position: { x: 40, y: 40 }, scale: BASE_PIXELS_PER_MM, snapStatus: null,
+  isGridSnapEnabled: false,
+  setGridSnapEnabled: (isGridSnapEnabled) => set({ isGridSnapEnabled }),
+  paperSize: 'Arch_D',
+  setPaperSize: (paperSize) => set({ paperSize }), alignmentGuides: [], proximityShape: null }),
+  measurementUnit: 'in',
+  setMeasurementUnit: (measurementUnit) => set({ measurementUnit }),
+  drawingScale: 1,
+  setDrawingScale: (drawingScale) => set({ drawingScale }),
+  eraserSize: 20,
+  setEraserSize: (eraserSize) => set({ eraserSize }),
+  activeLayerId: null,
+  setActiveLayerId: (activeLayerId) => set({ activeLayerId }),
+  activePageId: null,
+  setActivePageId: (activePageId) => set({ activePageId }),
 }));

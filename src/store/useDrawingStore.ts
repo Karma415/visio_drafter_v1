@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DrawingDocument, Shape, Bounds } from '../domain/document';
+import type { DrawingDocument, Shape, Bounds, Layer, Page } from '../domain/document';
 import { getShapePoints, flatShapePoints } from '../domain/document';
 import { MAX_SHAPES } from '../domain/document';
 import { validateDocument, validateShape } from '../domain/validation';
@@ -31,7 +31,14 @@ interface DrawingState {
   recoveryEnabled: boolean;
   enableRecovery: () => void;
   pauseRecovery: (warning: string) => void;
-  addShape: (shape: Omit<Shape, 'id'>) => void;
+  addPage: () => void;
+  removePage: (id: string) => void;
+  renamePage: (id: string, name: string) => void;
+  addLayer: () => void;
+  updateLayer: (id: string, updates: Partial<Layer>) => void;
+  removeLayer: (id: string) => void;
+  moveLayer: (id: string, direction: 'up' | 'down') => void;
+  addShape: (shape: Omit<Shape, 'id' | 'layerId'>) => void;
   updateBounds: (id: string, bounds: Bounds) => void;
   updateGeometry: (id: string, bounds: Bounds, properties?: Partial<Pick<Shape, 'fill' | 'rotation' | 'startAngle' | 'endAngle' | 'wallType' | 'wallThicknessMm' | 'furnitureKind' | 'text' | 'fontSize'>>) => void;
   updateText: (id: string, text: string) => void;
@@ -42,7 +49,7 @@ interface DrawingState {
   ungroupShape: (id: string) => void;
   deleteShape: (id: string) => void;
   clearCanvas: () => void;
-  updateSettings: (settings: Partial<Pick<DrawingDocument, 'name' | 'displayUnit' | 'gridMm'>>) => void;
+  updateSettings: (settings: Partial<Pick<DrawingDocument, 'name' | 'measurementUnit' | 'gridMm'>>) => void;
   openDocument: (document: DrawingDocument) => void;
   exportState: () => DrawingDocument;
   importState: (data: unknown) => void;
@@ -51,8 +58,21 @@ interface DrawingState {
 }
 const HISTORY_LIMIT = 50;
 
+export function getActivePage(document: DrawingDocument): Page {
+  const activePageId = useEditorStore.getState().activePageId;
+  return document.pages.find(p => p.id === activePageId) || document.pages[0];
+}
+
 export const useDrawingStore = create<DrawingState>((set, get) => {
   const recovery = loadRecovery();
+  function updateActivePage(document: DrawingDocument, change: (page: Page) => Page): DrawingDocument {
+    const activePage = getActivePage(document);
+    const pageIndex = document.pages.findIndex(p => p.id === activePage.id);
+    if (pageIndex === -1) return document;
+    const newPages = [...document.pages];
+    newPages[pageIndex] = change(newPages[pageIndex]);
+    return { ...document, pages: newPages };
+  }
   function commit(change: (document: DrawingDocument) => DrawingDocument) {
     set((state) => {
       const document = change(state.document);
@@ -63,10 +83,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     });
   }
   function updateShape(id: string, change: (shape: Shape) => Shape) {
-    commit((document) => {
-      if (!document.shapes.some((shape) => shape.id === id)) return document;
-      return { ...document, shapes: document.shapes.map((shape) => shape.id === id ? validateShape(change(shape)) : shape) };
-    });
+    commit((document) => updateActivePage(document, (page) => {
+      if (!page.shapes.some((shape) => shape.id === id)) return page;
+      return { ...page, shapes: page.shapes.map((shape) => shape.id === id ? validateShape(change(shape)) : shape) };
+    }));
   }
   function applyBounds(shape: Shape, bounds: Bounds): Shape {
     const side = isProportionalShape(shape) ? Math.max(bounds.width, bounds.height) : undefined;
@@ -91,11 +111,15 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     }
     return { ...shape, ...nextBounds };
   }
-  const selected = (ids: string[]) => get().document.shapes.filter(shape => ids.includes(shape.id));
+  const selected = (ids: string[]) => {
+    const activePageId = useEditorStore.getState().activePageId || get().document.pages[0]?.id;
+    const page = get().document.pages.find(p => p.id === activePageId);
+    return page ? page.shapes.filter(shape => ids.includes(shape.id)) : [];
+  };
   function insertCopies(shapes: Shape[], offset: number): string[] {
     if (!shapes.length) return [];
     const copies = shapes.map(shape => validateShape({ ...structuredClone(shape), id: crypto.randomUUID(), x: shape.x + offset, y: shape.y + offset }));
-    commit(document => ({ ...document, shapes: [...document.shapes, ...copies] }));
+    commit(document => updateActivePage(document, page => ({ ...page, shapes: [...page.shapes, ...copies] })));
     return copies.map(shape => shape.id);
   }
   return {
@@ -119,8 +143,8 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     duplicateShapes: ids => insertCopies(selected(ids), get().document.gridMm),
     replaceShapes: shapes => {
       const changes = new Map(shapes.map(shape => [shape.id, validateShape(shape)]));
-      commit(document => !document.shapes.some(shape => changes.has(shape.id)) ? document : ({ ...document,
-        shapes: document.shapes.map(shape => changes.get(shape.id) ?? shape) }));
+      commit(document => updateActivePage(document, page => !page.shapes.some(shape => changes.has(shape.id)) ? page : ({ ...page,
+        shapes: page.shapes.map(shape => changes.get(shape.id) ?? shape) })));
     },
     translateShapes: (ids, dx, dy) => {
       if (!Number.isFinite(dx) || !Number.isFinite(dy)) throw new Error('Move distance must be finite.');
@@ -128,16 +152,64 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     },
     alignSelection: (ids, alignment) => { const shapes = selected(ids); if (shapes.length >= 2) get().replaceShapes(alignShapes(shapes, alignment)); },
     distributeSelection: (ids, axis, gapMm) => { const shapes = selected(ids); if (shapes.length >= 3) get().replaceShapes(distributeShapes(shapes, axis, gapMm)); },
-    deleteShapes: ids => commit(document => document.shapes.some(shape => ids.includes(shape.id))
-      ? { ...document, shapes: document.shapes.filter(shape => !ids.includes(shape.id)) } : document),
+    deleteShapes: ids => commit(document => updateActivePage(document, page => page.shapes.some(shape => ids.includes(shape.id))
+      ? { ...page, shapes: page.shapes.filter(shape => !ids.includes(shape.id)) } : page)),
     document: recovery.document, past: [], future: [],
     recoveryWarning: recovery.warning, recoveryEnabled: recovery.enabled,
     enableRecovery: () => set({ recoveryEnabled: true, recoveryWarning: null }),
     pauseRecovery: (warning) => set({ recoveryEnabled: false, recoveryWarning: warning }),
-    addShape: (shape) => commit((document) => {
-      if (document.shapes.length >= MAX_SHAPES) throw new Error(`Maximum ${MAX_SHAPES} shapes reached.`);
-      return { ...document, shapes: [...document.shapes, validateShape({ ...shape, id: crypto.randomUUID() })] };
+    addPage: () => commit((document) => {
+      const id = crypto.randomUUID();
+      const newPage: Page = { id, name: `Page ${document.pages.length + 1}`, layers: [{ id: 'default', name: 'Layer 1', isVisible: true, isLocked: false }], shapes: [] };
+      setTimeout(() => useEditorStore.getState().setActivePageId(id), 0);
+      return { ...document, pages: [...document.pages, newPage] };
     }),
+    removePage: (id) => commit((document) => {
+      if (document.pages.length <= 1) return document;
+      const nextPages = document.pages.filter(p => p.id !== id);
+      setTimeout(() => useEditorStore.getState().setActivePageId(nextPages[0].id), 0);
+      return { ...document, pages: nextPages };
+    }),
+    renamePage: (id, name) => commit((document) => ({
+      ...document, pages: document.pages.map(p => p.id === id ? { ...p, name } : p)
+    })),
+    addLayer: () => commit((document) => updateActivePage(document, page => {
+      const id = crypto.randomUUID();
+      const newLayer: Layer = { id, name: `Layer ${page.layers.length + 1}`, isVisible: true, isLocked: false };
+      return { ...page, layers: [...page.layers, newLayer] };
+    })),
+    updateLayer: (id, updates) => commit((document) => updateActivePage(document, page => ({
+      ...page,
+      layers: page.layers.map(layer => layer.id === id ? { ...layer, ...updates } : layer)
+    }))),
+    removeLayer: (id) => commit((document) => updateActivePage(document, page => {
+      if (page.layers.length <= 1) return page;
+      const nextLayers = page.layers.filter(layer => layer.id !== id);
+      const fallbackId = nextLayers[0].id;
+      const nextShapes = page.shapes.map(shape => shape.layerId === id ? { ...shape, layerId: fallbackId } : shape);
+      return { ...page, layers: nextLayers, shapes: nextShapes };
+    })),
+    moveLayer: (id, direction) => commit((document) => updateActivePage(document, page => {
+      const index = page.layers.findIndex(layer => layer.id === id);
+      if (index === -1) return page;
+      if (direction === 'up' && index > 0) {
+        const layers = [...page.layers];
+        [layers[index - 1], layers[index]] = [layers[index], layers[index - 1]];
+        return { ...page, layers };
+      }
+      if (direction === 'down' && index < page.layers.length - 1) {
+        const layers = [...page.layers];
+        [layers[index + 1], layers[index]] = [layers[index], layers[index + 1]];
+        return { ...page, layers };
+      }
+      return page;
+    })),
+    addShape: (shape) => commit((document) => updateActivePage(document, page => {
+      if (page.shapes.length >= MAX_SHAPES) throw new Error(`Maximum ${MAX_SHAPES} shapes reached.`);
+      const activeLayerId = useEditorStore.getState().activeLayerId;
+      const layerId = activeLayerId && page.layers.some(l => l.id === activeLayerId) ? activeLayerId : (page.layers[0]?.id ?? 'default');
+      return { ...page, shapes: [...page.shapes, validateShape({ ...shape, layerId, id: crypto.randomUUID() })] };
+    })),
     updateBounds: (id, bounds) => updateShape(id, (shape) => applyBounds(shape, bounds)),
     updateGeometry: (id, bounds, properties = {}) => updateShape(id, (shape) => ({ ...applyBounds(shape, bounds), ...properties })),
     updateText: (id, text) => updateShape(id, (shape) => shape.type === 'text' ? { ...shape, text } : shape),
@@ -165,10 +237,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         fill: WALL_DEFINITIONS?.[properties.wallType]?.color || WALL_DEFINITIONS?.['interior_partition']?.color || '#334155',
       };
     }),
-    mergeWall: (id) => commit((document) => mergeMatchingWalls(document, id)),
-    groupWalls: (ids) => commit((document) => {
-      const selectedWalls = document.shapes.filter((s) => ids.includes(s.id) && s.type === 'wall');
-      if (selectedWalls.length < 2) return document;
+    mergeWall: (id) => commit((document) => updateActivePage(document, page => mergeMatchingWalls(page, id) as any)),
+    groupWalls: (ids) => commit((document) => updateActivePage(document, page => {
+      const selectedWalls = page.shapes.filter((s) => ids.includes(s.id) && s.type === 'wall');
+      if (selectedWalls.length < 2) return page;
 
       let currentPoints = getShapePoints(selectedWalls[0]).map((p) => ({ x: selectedWalls[0].x + p.x, y: selectedWalls[0].y + p.y }));
       const remainingSelected = [...selectedWalls.slice(1)];
@@ -225,20 +297,20 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       };
 
       const mergedIds = selectedWalls.filter(s => !remainingSelected.includes(s)).map(s => s.id);
-      const nextShapes = document.shapes.filter((s) => !mergedIds.includes(s.id));
+      const nextShapes = page.shapes.filter((s) => !mergedIds.includes(s.id));
       nextShapes.push(mergedWall);
       
       // Update selection out of band
       setTimeout(() => useEditorStore.getState().select(mergedWall.id), 0);
 
-      return { ...document, shapes: nextShapes };
-    }),
-    ungroupShape: (id) => commit((document) => {
-      const shapeIndex = document.shapes.findIndex((s) => s.id === id);
-      const shape = document.shapes[shapeIndex];
-      if (!shape || shape.type !== 'wall' || !shape.points || shape.points.length <= 4) return document;
+      return { ...page, shapes: nextShapes };
+    })),
+    ungroupShape: (id) => commit((document) => updateActivePage(document, page => {
+      const shapeIndex = page.shapes.findIndex((s) => s.id === id);
+      const shape = page.shapes[shapeIndex];
+      if (!shape || shape.type !== 'wall' || !shape.points || shape.points.length <= 4) return page;
 
-      const newShapes = [...document.shapes];
+      const newShapes = [...page.shapes];
       newShapes.splice(shapeIndex, 1);
 
       const points = shape.points;
@@ -256,10 +328,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         };
         newShapes.push(newShape);
       }
-      return { ...document, shapes: newShapes };
-    }),
-    deleteShape: (id) => commit((document) => ({ ...document, shapes: document.shapes.filter((shape) => shape.id !== id) })),
-    clearCanvas: () => commit((document) => ({ ...document, shapes: [] })),
+      return { ...page, shapes: newShapes };
+    })),
+    deleteShape: (id) => commit((document) => updateActivePage(document, page => ({ ...page, shapes: page.shapes.filter((shape) => shape.id !== id) }))),
+    clearCanvas: () => commit((document) => updateActivePage(document, page => ({ ...page, shapes: [] }))),
     updateSettings: (settings) => commit((document) => validateDocument({ ...document, ...settings })),
     openDocument: (document) => commit(() => validateDocument(document)),
     exportState: () => validateDocument(get().document),

@@ -21,6 +21,6 @@ export function DrawingGrid({ width, height, scale, position, gridMm }: Props) {
     return result;
   }, [width, height, scale, position, gridMm]);
   return <Layer listening={false}>{lines.map((line) =>
-    <Line key={line.key} points={line.points} stroke="#d6dee8" strokeWidth={1 / scale} />,
+    <Line key={line.key} points={line.points} stroke="#94a3b8" strokeWidth={1 / scale} opacity={0.6} />,
   )}</Layer>;
 }

@@ -25,13 +25,18 @@ export function DocumentSettings({ document }: { document: DrawingDocument }) {
       {error && <p className="error" role="alert">{error}</p>}
       <button type="submit" className="btn-primary">Apply setup</button>
     </form>
-    <label>Metric readouts<select value={document.displayUnit} onChange={(event) => {
+    <label>Metric readouts<select value={document.measurementUnit} onChange={(event) => {
       const unit = event.target.value;
-      if (unit === 'mm' || unit === 'cm') useDrawingStore.getState().updateSettings({ displayUnit: unit });
+      if (unit === 'mm' || unit === 'cm') useDrawingStore.getState().updateSettings({ measurementUnit: unit });
     }}><option value="mm">Millimeters</option><option value="cm">Centimeters</option></select></label>
     <p>Scale: <strong>1:25</strong><br />
       Snap: {formatNumber(mmToInches(document.gridMm))} in<br />
-      Visible grid: {formatMetric(visibleGridStep(document.gridMm, scale), document.displayUnit)} actual</p>
+      Visible grid: {formatMetric(visibleGridStep(document.gridMm, scale), document.measurementUnit)} actual</p>
     <small>Zoom affects your view only. Screen size is not calibrated to a physical ruler.</small>
-  </section>;
+  
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+        <input type="checkbox" checked={useEditorStore(state => state.isGridSnapEnabled)} onChange={e => useEditorStore.getState().setGridSnapEnabled(e.target.checked)} />
+        Enable Strict Snap-to-Grid
+      </label>
+    </section>;
 }
